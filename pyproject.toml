@@ -1,0 +1,96 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rstreamlabs-rstream"
+version = "0.1.0"
+description = "Python SDK for rstream tunnels."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "rstream" }]
+keywords = ["rstream", "tunnels", "networking", "webhooks"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+dependencies = [
+  "protobuf>=6.33.4,<7",
+  "PyYAML>=6.0.2,<7",
+]
+
+[project.optional-dependencies]
+api = ["httpx>=0.27,<1"]
+asgi = ["h11>=0.16,<1"]
+wsgi = ["h11>=0.16,<1"]
+examples = [
+  "aiohttp>=3.10,<4",
+  "django>=5.1,<6",
+  "fastapi>=0.110,<1",
+  "flask>=3.0,<4",
+  "h11>=0.16,<1",
+]
+dev = [
+  "aiohttp>=3.10,<4",
+  "build>=1.2,<2",
+  "django>=5.1,<6",
+  "fastapi>=0.110,<1",
+  "flask>=3.0,<4",
+  "httpx>=0.27,<1",
+  "mypy>=1.13,<2",
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.24,<1",
+  "ruff>=0.8,<1",
+  "trustme>=1.2,<2",
+]
+
+[project.urls]
+Homepage = "https://rstream.io"
+Documentation = "https://rstream.io/docs"
+Repository = "https://github.com/rstreamlabs/rstream-python"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rstream"]
+
+[tool.ruff]
+extend-exclude = ["src/rstream/_proto/rstream_pb2.py"]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
+ignore = ["RUF012"]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+
+[tool.mypy]
+exclude = ["src/rstream/_proto/rstream_pb2.py"]
+files = ["src/rstream", "tests"]
+python_version = "3.10"
+show_error_codes = true
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["google.protobuf.*", "yaml"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["django.test"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

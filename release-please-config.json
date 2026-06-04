@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "pull-request-header": "New release created",
+  "packages": {
+    ".": {
+      "release-type": "python",
+      "include-v-in-tag": true,
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "src/rstream/version.py"
+        }
+      ]
+    }
+  }
+}
