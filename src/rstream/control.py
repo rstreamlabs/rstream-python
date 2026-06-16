@@ -205,7 +205,7 @@ class ControlChannel:
                 asyncio.shield(self._done),
                 timeout=self._operation_timeout,
             )
-        except TimeoutError as error:
+        except asyncio.TimeoutError as error:
             timeout = RuntimeError(
                 "Timed out waiting for the engine control-channel close response.",
                 code="ERR_RSTREAM_OPERATION_TIMEOUT",
@@ -326,7 +326,7 @@ class ControlChannel:
                 asyncio.shield(future),
                 timeout=self._operation_timeout,
             )
-        except TimeoutError as error:
+        except asyncio.TimeoutError as error:
             timeout = RuntimeError(message, code="ERR_RSTREAM_OPERATION_TIMEOUT")
             raise timeout from error
 

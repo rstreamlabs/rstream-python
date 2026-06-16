@@ -146,7 +146,7 @@ async def _serve_stream(
                 if app_task is not None:
                     await request_queue.put({"type": "http.disconnect"})
                 return
-    except TimeoutError:
+    except asyncio.TimeoutError:
         if app_task is not None:
             await request_queue.put({"type": "http.disconnect"})
         if not response_state.started:

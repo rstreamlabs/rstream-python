@@ -106,7 +106,7 @@ async def _serve_stream(
         await _send_response(conn, stream, status, headers, chunks)
     except h11.RemoteProtocolError:
         await _send_response(conn, stream, 400, [], [b"Bad request."])
-    except TimeoutError:
+    except asyncio.TimeoutError:
         await _send_response(conn, stream, 408, [], [b"Request timeout."])
     except Exception:
         await _send_response(conn, stream, 500, [], [b"Internal server error."])

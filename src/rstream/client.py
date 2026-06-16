@@ -449,5 +449,5 @@ async def _wait_for_operation(
 ) -> _T:
     try:
         return await asyncio.wait_for(awaitable, timeout=timeout)
-    except TimeoutError as error:
+    except asyncio.TimeoutError as error:
         raise RuntimeError(message, code="ERR_RSTREAM_OPERATION_TIMEOUT") from error

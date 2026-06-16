@@ -3,7 +3,7 @@
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-.venv/
+.venv*/
 build/
 dist/
 htmlcov/
