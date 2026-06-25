@@ -1,1 +1,10 @@
 # TODO
+
+- Add datagram tunnel support
+  The SDK rejects datagram tunnels explicitly today. The engine protocol and the Go implementation define the semantics: datagram channels routed by a 12-byte stream-derived channel ID over QUIC datagrams when the transport supports them, with a length-framed fallback over streams. Bringing this to Python unlocks UDP-like workloads (RTP, aiortc-based WebRTC) from async Python. Requires QUIC runtime transport work first.
+
+- Investigate APPLICATION_DATA_AFTER_CLOSE_NOTIFY on dialed stream teardown
+  Long-lived dialed streams occasionally fail with ssl.SSLError "application data after close notify" when the peer closes mid-exchange, surfacing through asyncio's strict TLS shutdown handling. Applications can treat it as a normal disconnect, but the SDK should map it to a clean end-of-stream so consumers do not need SSL-specific handling. Observed against a production engine during the vision sample work (2026-06-11).
+
+- Reconnect control channels and tunnels automatically
+  When the engine connection behind a control channel drops, every tunnel created on it closes permanently and the accept loop raises; applications must rebuild the control channel and recreate their tunnels themselves (the vision sample now carries supervisor loops for this). The Go SDK re-establishes sessions transparently; the Python client should reach parity, ideally with the same backoff behavior, so a long-lived worker survives engine restarts with no application code. Same applies to the engine-api watch streams (SSE/WebSocket), which currently end on the first network error (2026-06-12).

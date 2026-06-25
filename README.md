@@ -25,6 +25,8 @@ production use:
 | Direct accept | `await tunnel.accept()` and async iteration |
 | ASGI helper | Direct HTTP/1.1 bridge for ASGI apps |
 | WSGI helper | Direct HTTP/1.1 bridge for WSGI apps |
+| Live inventory | `client.list_tunnels()` and `client.list_clients()` with filters |
+| Real-time events | `client.watch()` over SSE or WebSocket |
 | Webhooks | Signature generation, verification, and event parsing |
 | Config | CLI-compatible YAML config and environment variables |
 
@@ -167,6 +169,38 @@ asyncio.run(main())
 
 Private tunnels are addressed by name or ID. They do not expose a public
 forwarding address.
+
+## Live inventory and real-time events
+
+The engine exposes its live state through the same client. `list_tunnels` and
+`list_clients` return the current inventory, optionally filtered, and `watch`
+streams lifecycle events (`tunnel.created`, `tunnel.updated`,
+`tunnel.deleted`, and the client equivalents) as an async iterator. Label
+filters make the inventory usable as a service registry: tag tunnels at
+creation time, then discover them by label.
+
+```python
+import asyncio
+
+import rstream
+
+
+async def main() -> None:
+    async with rstream.Client.from_env() as client:
+        filters = rstream.TunnelFilters(labels={"role": "inference"})
+        for tunnel in await client.list_tunnels(filters=filters):
+            print(tunnel.properties.name, tunnel.status)
+        async for event in client.watch(tunnels=filters, transport="websocket"):
+            print(event.type, event.object)
+
+
+asyncio.run(main())
+```
+
+Listing and the SSE transport require the `api` extra (`pip install
+"rstreamlabs-rstream[api]"`); the WebSocket transport requires the `realtime` extra, which
+adds the `websockets` dependency. The watch connection uses the runtime token
+and ends when the surrounding task is cancelled.
 
 ## Webhook receiver
 

@@ -6,6 +6,14 @@ from types import ModuleType
 from rstream.client import Client
 from rstream.config import ClientOptions, ResolvedClientOptions, TLSOptions
 from rstream.control import ControlChannel
+from rstream.engine_api import (
+    ClientFilters,
+    Event,
+    EventStream,
+    TunnelFilters,
+    TunnelInventory,
+    WatchTransport,
+)
 from rstream.errors import (
     ConfigurationError,
     EngineError,
@@ -15,6 +23,7 @@ from rstream.errors import (
     RuntimeError,
     UnsupportedFeatureError,
 )
+from rstream.stable_domains import engine_hostname, generate_stable_domain
 from rstream.stream import RstreamStream
 from rstream.tunnel import BytestreamTunnel, format_forwarding_address
 from rstream.types import (
@@ -45,11 +54,14 @@ def __getattr__(name: str) -> ModuleType:
 __all__ = [
     "BytestreamTunnel",
     "Client",
+    "ClientFilters",
     "ClientOptions",
     "ConfigurationError",
     "ControlChannel",
     "CreateTunnelOptions",
     "EngineError",
+    "Event",
+    "EventStream",
     "ProtocolError",
     "ResolvedClientOptions",
     "RstreamError",
@@ -59,14 +71,19 @@ __all__ = [
     "ServerDetails",
     "TLSOptions",
     "TunnelAuth",
+    "TunnelFilters",
+    "TunnelInventory",
     "TunnelProperties",
     "UnsupportedFeatureError",
+    "WatchTransport",
     "WebhookEvent",
     "Webhooks",
     "__version__",
     "asgi",
     "build_headers",
+    "engine_hostname",
     "format_forwarding_address",
+    "generate_stable_domain",
     "generate_signing_secret",
     "sign_payload",
     "verify_event",

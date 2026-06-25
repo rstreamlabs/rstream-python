@@ -135,3 +135,46 @@ async with (
 
 See [examples/aiohttp-local-forwarding](../examples/aiohttp-local-forwarding)
 for a runnable version.
+
+## Discover tunnels and watch events
+
+Tunnels carry labels, and the engine inventory is queryable and watchable from
+the same client. This turns the tunnel registry into a service registry: tag
+tunnels at creation time, discover them by label, and react to lifecycle
+events in real time.
+
+```python
+async with rstream.Client.from_env() as client:
+    filters = rstream.TunnelFilters(labels={"role": "inference"})
+    workers = await client.list_tunnels(filters=filters)
+    async for event in client.watch(tunnels=filters):
+        if event.type in ("tunnel.created", "tunnel.deleted"):
+            ...  # refresh the worker set
+```
+
+`list_tunnels` returns `TunnelInventory` entries combining the tunnel
+properties with the live `status` and owning `client_id`. `watch` defaults to
+SSE and switches to WebSocket with `transport="websocket"`. Listing and SSE
+require the `api` extra; WebSocket requires the `realtime` extra.
+
+## Stable viewer domains
+
+A published tunnel created without a hostname is given a fresh engine endpoint
+each time. To keep a constant address across reconnects, generate a stable
+project-scoped domain once and pass it on every `create_tunnel`:
+
+```python
+async with rstream.Client.from_env() as client:
+    hostname = await client.generate_stable_hostname()
+    async with await client.connect() as control:
+        tunnel = await control.create_tunnel(
+            protocol="http", http_version="http/1.1",
+            publish=True, hostname=hostname,
+        )
+```
+
+The address has the form `<slug>-<project-endpoint>.t.<cluster-domain>`,
+matching the Go and C++ SDKs. Generating it once and reusing it is what makes
+it stable; the method returns `None` for engines that are not managed project
+hosts, in which case the engine allocates an address. The pure derivation is
+`rstream.generate_stable_domain(engine)`.

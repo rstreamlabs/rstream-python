@@ -135,7 +135,7 @@ def verify_event(
 
 
 class Webhooks:
-    """Object-oriented wrapper mirroring the JavaScript SDK helper."""
+    """Object-oriented helper around webhook verification."""
 
     def generate_signing_secret(self) -> str:
         return generate_signing_secret()

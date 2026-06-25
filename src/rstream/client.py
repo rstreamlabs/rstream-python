@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
+from collections.abc import AsyncIterator, Awaitable, Mapping
 from contextlib import suppress
 from typing import TypeVar
 
@@ -18,6 +18,18 @@ from rstream.config import (
     resolve_client_options,
 )
 from rstream.control import ControlChannel
+from rstream.engine_api import (
+    ClientFilters,
+    Event,
+    EventStream,
+    TunnelFilters,
+    TunnelInventory,
+    WatchTransport,
+    list_inventory,
+    tunnel_inventory_from_json,
+    watch_events,
+    watch_params_json,
+)
 from rstream.errors import ConfigurationError, ProtocolError, RuntimeError
 from rstream.protocol import (
     engine_error_from_pb,
@@ -28,6 +40,7 @@ from rstream.protocol import (
     server_details_from_pb,
     write_message,
 )
+from rstream.stable_domains import generate_stable_domain
 from rstream.stream import RstreamStream
 
 _T = TypeVar("_T")
@@ -229,6 +242,104 @@ class Client:
         zero_rtt: bool | None = None,
     ) -> RstreamStream:
         return await self.dial(tunnel, token=token, zero_rtt=zero_rtt)
+
+    async def generate_stable_hostname(self) -> str | None:
+        """Derive a stable, project-scoped hostname from the resolved engine.
+
+        Generate it once and reuse it on every ``create_tunnel`` so a
+        published tunnel keeps the same address across reconnects. Returns
+        ``None`` when the engine is not a managed project host, in which case
+        the engine allocates an address. See :mod:`rstream.stable_domains`.
+        """
+        self._ensure_open()
+        resolved = await self._get_resolved()
+        engine = await self._resolve_engine(resolved)
+        return generate_stable_domain(engine)
+
+    async def list_tunnels(
+        self,
+        *,
+        filters: TunnelFilters | None = None,
+        limit: int | None = None,
+    ) -> list[TunnelInventory]:
+        """List live tunnels from the engine inventory."""
+        self._ensure_open()
+        engine, token, tls = await self._engine_api_target()
+        params: dict[str, object] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if filters is not None:
+            params["filters"] = filters.to_json()
+        items = await list_inventory(
+            engine=engine,
+            token=token,
+            path="/tunnels",
+            params_json=params or None,
+            tls=tls,
+        )
+        return [tunnel_inventory_from_json(item) for item in items]
+
+    async def list_clients(
+        self,
+        *,
+        filters: ClientFilters | None = None,
+        limit: int | None = None,
+    ) -> list[Mapping[str, object]]:
+        """List live runtime clients from the engine inventory."""
+        self._ensure_open()
+        engine, token, tls = await self._engine_api_target()
+        params: dict[str, object] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if filters is not None:
+            params["filters"] = filters.to_json()
+        return await list_inventory(
+            engine=engine,
+            token=token,
+            path="/clients",
+            params_json=params or None,
+            tls=tls,
+        )
+
+    def watch(
+        self,
+        *,
+        tunnels: TunnelFilters | None = None,
+        clients: ClientFilters | None = None,
+        transport: WatchTransport = "sse",
+    ) -> EventStream:
+        """Stream real-time engine events.
+
+        Events describe tunnel and client lifecycle changes
+        (``tunnel.created``, ``tunnel.updated``, ``tunnel.deleted``, and the
+        client equivalents), optionally filtered. The returned stream is an
+        async iterator and an async context manager; the connection closes
+        when the stream is closed or the surrounding task is cancelled.
+        """
+        self._ensure_open()
+
+        async def generate() -> AsyncIterator[Event]:
+            engine, token, tls = await self._engine_api_target()
+            source = watch_events(
+                engine=engine,
+                token=token,
+                params_json=watch_params_json(tunnels, clients),
+                tls=tls,
+                transport=transport,
+            )
+            try:
+                async for event in source:
+                    yield event
+            finally:
+                await source.aclose()
+
+        return EventStream(generate())
+
+    async def _engine_api_target(self) -> tuple[str, str | None, TLSOptions | None]:
+        resolved = await self._get_resolved()
+        engine = await self._resolve_engine(resolved)
+        token = await self._resolve_token(resolved, engine)
+        return engine, token, resolved.tls
 
     async def close(self) -> None:
         if self._closed:
