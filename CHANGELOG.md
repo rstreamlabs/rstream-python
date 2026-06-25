@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/rstreamlabs/rstream-python/compare/v0.1.1...v0.2.0) (2026-06-25)
+
+
+### Features
+
+* add engine API watch and stable domains support ([eb41f8c](https://github.com/rstreamlabs/rstream-python/commit/eb41f8c20babfa3222d8510e5e49d2cc97ede221))
+
 ## [0.1.1](https://github.com/rstreamlabs/rstream-python/compare/v0.1.0...v0.1.1) (2026-06-16)
 
 
