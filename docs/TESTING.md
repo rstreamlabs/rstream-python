@@ -61,20 +61,22 @@ When bypassing the shared rstream config file, pass explicit engine settings:
 ```bash
 RSTREAM_PYTHON_E2E_ENGINE="c.localhost.rstream.io:9443" \
 RSTREAM_PYTHON_E2E_TOKEN="$RSTREAM_AUTHENTICATION_TOKEN" \
-RSTREAM_PYTHON_E2E_CA_FILE="/path/to/local-ca.pem" \
-RSTREAM_PYTHON_E2E_SERVER_NAME="localhost" \
+RSTREAM_PYTHON_E2E_TLS_INSECURE=1 \
 pytest tests/e2e
 ```
 
-If the local engine uses a certificate already trusted by the system, omit
-`RSTREAM_PYTHON_E2E_CA_FILE` and `RSTREAM_PYTHON_E2E_SERVER_NAME`.
+If the local engine uses a private CA, prefer
+`RSTREAM_PYTHON_E2E_CA_FILE="/path/to/local-ca.pem"` instead of
+`RSTREAM_PYTHON_E2E_TLS_INSECURE=1`. `RSTREAM_PYTHON_E2E_SERVER_NAME` is only
+needed when the certificate name intentionally differs from the engine host.
 
 ## Local EE engine
 
-The engine repository documents the full local setup in:
+The engine repository documents the full local setup in its Enterprise Edition
+runtime README:
 
 ```text
-../rstream-engine-v2/cmd/rstream-engine-ee/README.md
+cmd/rstream-engine-ee/README.md
 ```
 
 Start the EE engine, select the test context, then run:

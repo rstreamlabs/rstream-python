@@ -295,10 +295,15 @@ def real_engine_client(*, zero_rtt: bool) -> rstream.Client:
         return rstream.Client.from_env(zero_rtt=zero_rtt)
     token = os.environ.get("RSTREAM_PYTHON_E2E_TOKEN")
     ca_file = os.environ.get("RSTREAM_PYTHON_E2E_CA_FILE")
+    insecure_skip_verify = os.environ.get("RSTREAM_PYTHON_E2E_TLS_INSECURE") == "1"
     server_name = os.environ.get("RSTREAM_PYTHON_E2E_SERVER_NAME")
     tls = (
-        rstream.TLSOptions(ca_file=ca_file, server_name=server_name)
-        if ca_file or server_name
+        rstream.TLSOptions(
+            ca_file=ca_file,
+            insecure_skip_verify=insecure_skip_verify,
+            server_name=server_name,
+        )
+        if ca_file or insecure_skip_verify or server_name
         else None
     )
     return rstream.Client(
