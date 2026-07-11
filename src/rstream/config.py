@@ -51,6 +51,7 @@ class ClientOptions:
     tls: TLSOptions | None = None
     token: str | None = None
     zero_rtt: bool = True
+    tunnel_transport: str | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,7 @@ class ResolvedClientOptions:
     tls: TLSOptions | None
     token: str | None
     zero_rtt: bool
+    tunnel_transport: str
 
 
 @dataclass(frozen=True)
@@ -131,6 +133,7 @@ class _ResolvedConfig:
     project_endpoint: str | None = None
     tls: TLSOptions | None = None
     token: str | None = None
+    tunnel_transport: str | None = None
 
 
 @dataclass(frozen=True)
@@ -142,7 +145,8 @@ class _EnvSettings:
     mtls_cert: str | None = None
     mtls_key: str | None = None
     token: str | None = None
-    use_quic: bool = False
+    tunnel_transport: str | None = None
+    use_quic: bool | None = None
 
 
 _DNS_LABEL_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", re.I)
@@ -173,9 +177,15 @@ async def resolve_client_options(options: ClientOptions) -> ResolvedClientOption
         )
     if token is not None:
         _validate_token_expiry(token)
-    if env.use_quic:
+    requested_transport = _resolve_tunnel_transport_mode(
+        options.tunnel_transport,
+        env.tunnel_transport,
+        env.use_quic,
+        config.tunnel_transport,
+    )
+    if requested_transport == "quic":
         raise UnsupportedFeatureError(
-            "RSTREAM_QUIC_TRANSPORT is not supported by rstream-python.",
+            "QUIC tunnel transport is not supported by rstream-python.",
             code="ERR_RSTREAM_UNSUPPORTED_TRANSPORT",
         )
     if options.require_token and token is None and not _tls_has_client_certificate(tls):
@@ -217,6 +227,7 @@ async def resolve_client_options(options: ClientOptions) -> ResolvedClientOption
         tls=tls,
         token=token,
         zero_rtt=options.zero_rtt,
+        tunnel_transport="tls",
     )
 
 
@@ -345,8 +356,13 @@ def _resolve_config(
             "Refusing to use stored mTLS credentials with an explicit engine override.",
             code="ERR_RSTREAM_STORED_MTLS_ENGINE_OVERRIDE",
         )
-    _reject_unsupported_transport(environment.transport if environment else None)
-    _reject_unsupported_transport(context.transport if context else None)
+    environment_transport = environment.transport if environment else None
+    context_transport = context.transport if context else None
+    _reject_unsupported_transport(environment_transport)
+    _reject_unsupported_transport(context_transport)
+    tunnel_transport = _transport_mode_from_config(context_transport)
+    if tunnel_transport is None:
+        tunnel_transport = _transport_mode_from_config(environment_transport)
     return _ResolvedConfig(
         api_url=api_url,
         context_engine=context.engine if context else None,
@@ -354,10 +370,12 @@ def _resolve_config(
         project_endpoint=context.project_endpoint if context else None,
         tls=tls,
         token=token,
+        tunnel_transport=tunnel_transport,
     )
 
 
 def _read_env() -> _EnvSettings:
+    legacy_quic = _normalize_optional(os.getenv("RSTREAM_QUIC_TRANSPORT"))
     return _EnvSettings(
         api_url=_normalize_api_url(os.getenv("RSTREAM_API_URL")),
         config_path=_normalize_optional(os.getenv("RSTREAM_CONFIG")),
@@ -371,7 +389,8 @@ def _read_env() -> _EnvSettings:
         mtls_cert=_normalize_optional(os.getenv("RSTREAM_MTLS_CERT_FILE")),
         mtls_key=_normalize_optional(os.getenv("RSTREAM_MTLS_KEY_FILE")),
         token=_normalize_optional(os.getenv("RSTREAM_AUTHENTICATION_TOKEN")),
-        use_quic=os.getenv("RSTREAM_QUIC_TRANSPORT") == "1",
+        tunnel_transport=_normalize_optional(os.getenv("RSTREAM_TUNNEL_TRANSPORT")),
+        use_quic=None if legacy_quic is None else legacy_quic == "1",
     )
 
 
@@ -568,11 +587,8 @@ def _resolve_mtls_options(
 def _reject_unsupported_transport(transport: _TransportConfig | None) -> None:
     if transport is None or not transport.raw:
         return
-    if transport.raw.get("useQuic") is True:
-        raise UnsupportedFeatureError(
-            "QUIC transport is not supported by rstream-python.",
-            code="ERR_RSTREAM_UNSUPPORTED_TRANSPORT",
-        )
+    if "mode" in transport.raw:
+        _parse_tunnel_transport_mode(transport.raw.get("mode"))
     unsupported = [
         key
         for key in ("bind", "dns", "ipFamily", "mptcp", "proxy")
@@ -584,6 +600,50 @@ def _reject_unsupported_transport(transport: _TransportConfig | None) -> None:
             f"Transport option(s) not supported by rstream-python: {joined}.",
             code="ERR_RSTREAM_UNSUPPORTED_TRANSPORT",
         )
+
+
+def _transport_mode_from_config(transport: _TransportConfig | None) -> str | None:
+    if transport is None:
+        return None
+    if "mode" in transport.raw:
+        return _parse_tunnel_transport_mode(transport.raw.get("mode"))
+    if "useQuic" in transport.raw:
+        value = transport.raw.get("useQuic")
+        if not isinstance(value, bool):
+            raise ConfigurationError(
+                "transport.useQuic must be a boolean.",
+                code="ERR_RSTREAM_INVALID_CONFIG",
+            )
+        return "quic" if value else "tls"
+    return None
+
+
+def _resolve_tunnel_transport_mode(
+    explicit: str | None,
+    environment: str | None,
+    legacy_environment: bool | None,
+    configured: str | None,
+) -> str:
+    direct = _first_defined(explicit, environment)
+    if direct is not None:
+        return _parse_tunnel_transport_mode(direct)
+    if legacy_environment is not None:
+        return "quic" if legacy_environment else "tls"
+    return configured or "auto"
+
+
+def _parse_tunnel_transport_mode(value: object) -> str:
+    if not isinstance(value, str):
+        raise ConfigurationError(
+            "transport.mode must be a string.", code="ERR_RSTREAM_INVALID_CONFIG"
+        )
+    mode = value.strip().lower()
+    if mode not in {"auto", "tls", "quic"}:
+        raise ConfigurationError(
+            f'Invalid tunnel transport "{value}" (valid: auto, tls, quic).',
+            code="ERR_RSTREAM_INVALID_CONFIG",
+        )
+    return mode
 
 
 def _merge_tls_options(

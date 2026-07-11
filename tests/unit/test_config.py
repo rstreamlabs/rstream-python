@@ -10,7 +10,7 @@ from rstream.config import (
     normalize_engine_address,
     resolve_client_options,
 )
-from rstream.errors import ConfigurationError
+from rstream.errors import ConfigurationError, UnsupportedFeatureError
 
 
 def test_default_runtime_timeouts_are_resolved() -> None:
@@ -20,6 +20,7 @@ def test_default_runtime_timeouts_are_resolved() -> None:
 
     assert resolved.connect_timeout == 15.0
     assert resolved.operation_timeout == 30.0
+    assert resolved.tunnel_transport == "tls"
 
 
 @pytest.mark.parametrize(
@@ -123,3 +124,70 @@ contexts:
 
     assert resolved.token is None
     assert resolved.no_token is True
+
+
+def test_tunnel_transport_environment_precedence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RSTREAM_QUIC_TRANSPORT", "1")
+    monkeypatch.setenv("RSTREAM_TUNNEL_TRANSPORT", "auto")
+    resolved = asyncio.run(
+        resolve_client_options(
+            ClientOptions(
+                read_config_file=False, no_token=True, engine="engine.test:443"
+            )
+        )
+    )
+    assert resolved.tunnel_transport == "tls"
+
+    monkeypatch.setenv("RSTREAM_TUNNEL_TRANSPORT", "quic")
+    with pytest.raises(UnsupportedFeatureError, match="QUIC tunnel transport"):
+        asyncio.run(
+            resolve_client_options(
+                ClientOptions(
+                    read_config_file=False,
+                    no_token=True,
+                    engine="engine.test:443",
+                )
+            )
+        )
+
+
+def test_context_tunnel_transport_overrides_environment(tmp_path: Path) -> None:
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        """
+version: 1
+defaults:
+  context:
+    name: local
+environments:
+  - apiUrl: https://rstream.io
+    transport:
+      mode: quic
+contexts:
+  - name: local
+    apiUrl: https://rstream.io
+    engine: engine.test:443
+    transport:
+      useQuic: false
+""".strip(),
+        encoding="utf-8",
+    )
+    resolved = asyncio.run(
+        resolve_client_options(ClientOptions(config_path=str(config), no_token=True))
+    )
+    assert resolved.tunnel_transport == "tls"
+
+
+def test_invalid_tunnel_transport_is_rejected() -> None:
+    with pytest.raises(ConfigurationError, match="valid: auto, tls, quic"):
+        asyncio.run(
+            resolve_client_options(
+                ClientOptions(
+                    read_config_file=False,
+                    no_token=True,
+                    tunnel_transport="udp",
+                )
+            )
+        )

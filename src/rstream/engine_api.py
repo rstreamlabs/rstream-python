@@ -172,6 +172,9 @@ def tunnel_properties_from_json(data: Mapping[str, object]) -> TunnelProperties:
         hostname=_optional_str(data, "hostname"),
         port=_optional_int(data, "port"),
         upstream_tls=_optional_bool(data, "upstream_tls"),
+        datagram_guaranteed_delivery=_optional_bool(
+            data, "datagram_guaranteed_delivery"
+        ),
     )
 
 

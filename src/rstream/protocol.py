@@ -151,6 +151,10 @@ def tunnel_properties_to_pb(properties: TunnelProperties) -> pb.TunnelProperties
         result.port.CopyFrom(UInt32Value(value=properties.port))
     if properties.upstream_tls is not None:
         result.upstream_tls.CopyFrom(BoolValue(value=properties.upstream_tls))
+    if properties.datagram_guaranteed_delivery is not None:
+        result.datagram_guaranteed_delivery.CopyFrom(
+            BoolValue(value=properties.datagram_guaranteed_delivery)
+        )
     return result
 
 
@@ -198,6 +202,9 @@ def tunnel_properties_from_pb(properties: pb.TunnelProperties) -> TunnelProperti
         port=wrapper_uint32(optional_field(properties, "port", UInt32Value)),
         upstream_tls=wrapper_bool(
             optional_field(properties, "upstream_tls", BoolValue)
+        ),
+        datagram_guaranteed_delivery=wrapper_bool(
+            optional_field(properties, "datagram_guaranteed_delivery", BoolValue)
         ),
     )
 
