@@ -28,6 +28,8 @@ Set `RSTREAM_CONFIG` to use another file.
 | `RSTREAM_MTLS_CERT_FILE` | mTLS client certificate path. |
 | `RSTREAM_MTLS_KEY_FILE` | mTLS client key path. |
 | `RSTREAM_API_URL` | Control plane API URL for managed project discovery. |
+| `RSTREAM_TUNNEL_TRANSPORT` | `auto`, `tls`, or `quic`. Python maps `auto` to TLS and rejects explicit `quic`. |
+| `RSTREAM_QUIC_TRANSPORT` | Legacy selector. Prefer `RSTREAM_TUNNEL_TRANSPORT`. |
 
 The SDK also accepts `RSTREAM_ENGINE_ADDRESS` for compatibility with older
 local C++ SDK workflows. Prefer `RSTREAM_ENGINE` in new code.
@@ -52,6 +54,18 @@ contexts:
 If an explicit engine override is provided, stored tokens or stored mTLS
 credentials from another context are refused. Pass an explicit token, explicit
 mTLS files, or `no_token=True` for local unauthenticated engines.
+
+The shared transport selector is available through `ClientOptions.tunnel_transport`
+and YAML:
+
+```yaml
+transport:
+  mode: auto
+```
+
+The Python runtime currently implements TLS only. The default `auto` mode uses
+TLS, while an explicit `quic` request fails during resolution instead of being
+silently downgraded. Legacy `transport.useQuic` remains readable.
 
 ## Unsupported config
 

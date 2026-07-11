@@ -32,6 +32,7 @@ def test_tunnel_properties_round_trip() -> None:
         rstream_auth=True,
         hostname="api.example.test",
         port=443,
+        datagram_guaranteed_delivery=True,
     )
 
     decoded = tunnel_properties_from_pb(tunnel_properties_to_pb(properties))
@@ -46,6 +47,7 @@ def test_tunnel_properties_round_trip() -> None:
     assert decoded.rstream_auth is True
     assert decoded.hostname == "api.example.test"
     assert decoded.port == 443
+    assert decoded.datagram_guaranteed_delivery is True
 
 
 def test_message_encoding_prefixes_payload_length() -> None:

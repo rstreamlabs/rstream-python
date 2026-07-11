@@ -49,6 +49,7 @@ class TunnelProperties:
     hostname: str | None = None
     port: int | None = None
     upstream_tls: bool | None = None
+    datagram_guaranteed_delivery: bool | None = None
 
 
 @dataclass(frozen=True)
