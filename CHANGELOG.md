@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/rstreamlabs/rstream-python/compare/v0.3.0...v0.4.0) (2026-07-18)
+
+
+### Features
+
+* add published TCP tunnels ([f1b2e89](https://github.com/rstreamlabs/rstream-python/commit/f1b2e89d1a5baf26b13b72e069c982335d7af934))
+
 ## [0.3.0](https://github.com/rstreamlabs/rstream-python/compare/v0.2.0...v0.3.0) (2026-07-11)
 
 
