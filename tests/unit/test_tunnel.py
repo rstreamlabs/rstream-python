@@ -37,6 +37,19 @@ def test_format_forwarding_address_includes_non_default_port() -> None:
     assert address == "tls.example.test:8443 (tls)"
 
 
+def test_format_forwarding_address_for_published_tcp_tunnel() -> None:
+    address = format_forwarding_address(
+        TunnelProperties(
+            id="tun_123",
+            protocol="tcp",
+            hostname="tcp.example.test",
+            port=10042,
+        )
+    )
+
+    assert address == "tcp.example.test:10042 (tcp)"
+
+
 def test_format_forwarding_address_uses_private_name_or_id() -> None:
     assert (
         format_forwarding_address(TunnelProperties(id="tun_123", name="private-api"))

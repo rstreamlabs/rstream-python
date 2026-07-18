@@ -56,6 +56,18 @@ RSTREAM_PYTHON_E2E_PUBLISHED=1 \
 pytest tests/e2e
 ```
 
+Published TCP checks have a separate opt-in because the project and engine must
+allow published TCP tunnels and the allocated port must be reachable:
+
+```bash
+RSTREAM_PYTHON_E2E=1 \
+RSTREAM_PYTHON_E2E_PUBLISHED_TCP=1 \
+pytest tests/e2e
+```
+
+Set `RSTREAM_PYTHON_E2E_PUBLISHED_CONNECT_HOST` when the hostname returned by a
+local engine is not directly resolvable from the test process.
+
 When bypassing the shared rstream config file, pass explicit engine settings:
 
 ```bash
@@ -85,5 +97,6 @@ Start the EE engine, select the test context, then run:
 RSTREAM_CONTEXT=tests \
 RSTREAM_PYTHON_E2E=1 \
 RSTREAM_PYTHON_E2E_PUBLISHED=1 \
+RSTREAM_PYTHON_E2E_PUBLISHED_TCP=1 \
 pytest tests/e2e
 ```

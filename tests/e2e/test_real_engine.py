@@ -116,6 +116,57 @@ async def test_real_engine_published_http_tunnel() -> None:
 
 
 @pytest.mark.asyncio
+async def test_real_engine_published_tcp_tunnel() -> None:
+    if (
+        not real_engine_enabled()
+        or os.environ.get("RSTREAM_PYTHON_E2E_PUBLISHED_TCP") != "1"
+    ):
+        pytest.skip(
+            "Set RSTREAM_PYTHON_E2E=1 and RSTREAM_PYTHON_E2E_PUBLISHED_TCP=1 "
+            "to run published-TCP e2e tests."
+        )
+
+    local_server = await asyncio.start_server(handle_tcp_echo, "127.0.0.1", 0)
+    forward_task: asyncio.Task[None] | None = None
+    client = real_engine_client(zero_rtt=False)
+    try:
+        local_host, local_port = server_address(local_server)
+        async with client, await client.connect() as control:
+            tunnel = await control.create_tunnel(
+                labels={"sdk": "python", "test": "published-tcp-e2e"},
+                protocol="tcp",
+            )
+            assert tunnel.properties.hostname is not None
+            assert tunnel.properties.port is not None
+            forward_task = asyncio.create_task(
+                tunnel.forward_to(local_host, local_port)
+            )
+            connect_host = os.environ.get(
+                "RSTREAM_PYTHON_E2E_PUBLISHED_CONNECT_HOST",
+                tunnel.properties.hostname,
+            )
+            try:
+                reader, writer = await asyncio.open_connection(
+                    connect_host,
+                    tunnel.properties.port,
+                )
+                try:
+                    writer.write(b"ping")
+                    await writer.drain()
+                    assert await reader.readexactly(4) == b"PING"
+                finally:
+                    writer.close()
+                    await writer.wait_closed()
+            finally:
+                await tunnel.close()
+                forward_task.cancel()
+                await asyncio.gather(forward_task, return_exceptions=True)
+    finally:
+        local_server.close()
+        await local_server.wait_closed()
+
+
+@pytest.mark.asyncio
 async def test_real_engine_private_wsgi_tunnel() -> None:
     if not real_engine_enabled():
         pytest.skip(
@@ -270,6 +321,19 @@ async def handle_http_hostname(
             + b"content-type: text/plain\r\n\r\n"
             + body
         )
+        await writer.drain()
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+
+async def handle_tcp_echo(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+) -> None:
+    try:
+        payload = await reader.readexactly(4)
+        writer.write(payload.upper())
         await writer.drain()
     finally:
         writer.close()
