@@ -136,6 +136,26 @@ async with (
 See [examples/aiohttp-local-forwarding](../examples/aiohttp-local-forwarding)
 for a runnable version.
 
+## Published TCP tunnels
+
+Set `protocol="tcp"` for a published raw TCP bytestream. Leave `port` unset for an ephemeral address, or set it to a port already reserved by the project through the Control plane:
+
+```python
+async with (
+    rstream.Client.from_env() as client,
+    await client.connect() as control,
+):
+    tunnel = await control.create_tunnel(
+        protocol="tcp",
+        publish=True,
+        port=10042,
+    )
+    print(tunnel.forwarding_address)
+    await tunnel.forward_to("127.0.0.1", 22)
+```
+
+The SDK does not reserve the port. A TCP tunnel forwards the downstream connection without adding encryption or authentication, so use a secure application protocol such as SSH. Use a TLS tunnel for TLS traffic.
+
 ## Discover tunnels and watch events
 
 Tunnels carry labels, and the engine inventory is queryable and watchable from

@@ -10,7 +10,7 @@ Python SDK.
 | Control channel | TLS handshake, open response validation, tunnel creation, tunnel close, control close, unexpected transport close. |
 | Timeouts | Engine connection timeout, control open timeout, tunnel open timeout, tunnel close timeout, stream handshake timeout, proxy handshake timeout. |
 | Private streams | Dial by name, dial by ID, zero-RTT on, zero-RTT off, concurrent dials. |
-| Published tunnels | HTTP/1.1 bytestream creation, local TCP forwarding, direct ASGI serving, and published HTTP fetch in real-engine e2e. |
+| Published tunnels | HTTP/1.1 and TCP tunnel creation, local forwarding, direct ASGI serving, and published HTTP/TCP reachability in real-engine e2e. |
 | Framework adapters | Direct ASGI dispatch, streaming and chunked ASGI request bodies, direct WSGI dispatch, chunked WSGI request bodies, oversized payloads, framework errors, WSGI write callable, and real-engine ASGI/WSGI paths. |
 | Proxy delivery | Engine-initiated proxy connection, app-side `accept()`, response propagation, proxy error reporting. |
 | Webhooks | Signing, header building, signature verification, tolerance window, malformed payloads, parsed event object. |

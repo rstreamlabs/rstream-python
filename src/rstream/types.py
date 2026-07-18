@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Literal
 
 TunnelType = Literal["bytestream", "datagram"]
-TunnelProtocol = Literal["tls", "dtls", "quic", "http"]
+TunnelProtocol = Literal["tls", "tcp", "dtls", "quic", "http"]
 HTTPVersion = Literal["http/1.1", "h2", "h2c", "h3"]
 TLSMode = Literal["passthrough", "terminated"]
 
@@ -73,6 +73,7 @@ class CreateTunnelOptions:
     rstream_auth: bool | None = None
     challenge_mode: bool | None = None
     hostname: str | None = None
+    port: int | None = None
     upstream_tls: bool | None = None
     auth: TunnelAuth | None = None
 

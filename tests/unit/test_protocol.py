@@ -50,6 +50,20 @@ def test_tunnel_properties_round_trip() -> None:
     assert decoded.datagram_guaranteed_delivery is True
 
 
+def test_published_tcp_properties_round_trip() -> None:
+    properties = TunnelProperties(
+        type="bytestream",
+        publish=True,
+        protocol="tcp",
+        port=10042,
+    )
+
+    decoded = tunnel_properties_from_pb(tunnel_properties_to_pb(properties))
+
+    assert decoded.protocol == "tcp"
+    assert decoded.port == 10042
+
+
 def test_message_encoding_prefixes_payload_length() -> None:
     message = pb.Message()
     message.heartbeat.CopyFrom(pb.Heartbeat())

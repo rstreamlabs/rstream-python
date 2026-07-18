@@ -119,6 +119,8 @@ def format_forwarding_address(properties: TunnelProperties) -> str:
             return f"https://{published}"
         if properties.protocol == "tls":
             return f"{published} (tls)"
+        if properties.protocol == "tcp":
+            return f"{published} (tcp)"
         if properties.protocol == "dtls":
             return f"{published} (dtls)"
         if properties.protocol == "quic":
@@ -137,7 +139,7 @@ def format_forwarding_address(properties: TunnelProperties) -> str:
 def _published_host(properties: TunnelProperties) -> str | None:
     if properties.hostname and properties.hostname.strip():
         port = properties.port or DEFAULT_PUBLISHED_PORT
-        if properties.protocol == "tls" or port != DEFAULT_PUBLISHED_PORT:
+        if properties.protocol in {"tls", "tcp"} or port != DEFAULT_PUBLISHED_PORT:
             return f"{properties.hostname}:{port}"
         return properties.hostname
     if properties.host and properties.host.strip():

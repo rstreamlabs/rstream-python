@@ -33,6 +33,26 @@ async def test_connect_create_and_close_tunnel(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_published_tcp_options_and_local_validation(tmp_path: Path) -> None:
+    async with await FakeEngine.start(tmp_path) as engine:
+        client = client_for(engine)
+
+        async with await client.connect() as control:
+            tunnel = await control.create_tunnel(protocol="tcp", port=10042)
+            assert tunnel.forwarding_address == "test.localhost:10042 (tcp)"
+            with pytest.raises(
+                rstream.RstreamRuntimeError, match="do not accept"
+            ) as exc:
+                await control.create_tunnel(
+                    protocol="tcp",
+                    hostname="ssh.example.test",
+                )
+            assert exc.value.code == "ERR_RSTREAM_INVALID_TUNNEL"
+
+        assert engine.open_tunnel_requests == 1
+
+
+@pytest.mark.asyncio
 async def test_dial_private_tunnel_with_and_without_zero_rtt(tmp_path: Path) -> None:
     async with await FakeEngine.start(tmp_path) as engine:
         client = client_for(engine)
@@ -430,12 +450,21 @@ class FakeEngine:
         response.open_tunnel_rsp.tunnel_properties.type.CopyFrom(
             StringValue(value="bytestream")
         )
-        response.open_tunnel_rsp.tunnel_properties.protocol.CopyFrom(
-            StringValue(value="http")
-        )
+        if request.tunnel_properties.HasField("protocol"):
+            response.open_tunnel_rsp.tunnel_properties.protocol.CopyFrom(
+                request.tunnel_properties.protocol
+            )
+        else:
+            response.open_tunnel_rsp.tunnel_properties.protocol.CopyFrom(
+                StringValue(value="http")
+            )
         response.open_tunnel_rsp.tunnel_properties.hostname.CopyFrom(
             StringValue(value="test.localhost")
         )
+        if request.tunnel_properties.HasField("port"):
+            response.open_tunnel_rsp.tunnel_properties.port.CopyFrom(
+                request.tunnel_properties.port
+            )
         await write_message(writer, response)
 
     async def _handle_close_tunnel(

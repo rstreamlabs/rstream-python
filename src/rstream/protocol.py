@@ -362,7 +362,7 @@ def cast_tunnel_type(value: str | None) -> TunnelType | None:
 
 
 def cast_protocol(value: str | None) -> TunnelProtocol | None:
-    if value in {"tls", "dtls", "quic", "http"}:
+    if value in {"tls", "tcp", "dtls", "quic", "http"}:
         return cast(TunnelProtocol, value)
     return None
 

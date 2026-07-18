@@ -24,6 +24,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_INVALID_STREAM: _ClassVar[ErrorCode]
     ERROR_CODE_FEATURE_NOT_AVAILABLE: _ClassVar[ErrorCode]
     ERROR_CODE_SERVICE_UNAVAILABLE: _ClassVar[ErrorCode]
+    ERROR_CODE_CAPACITY_EXHAUSTED: _ClassVar[ErrorCode]
     ERROR_CODE_INTERNAL: _ClassVar[ErrorCode]
 ERROR_CODE_UNSPECIFIED: ErrorCode
 ERROR_CODE_UNAUTHORIZED: ErrorCode
@@ -35,6 +36,7 @@ ERROR_CODE_TUNNEL_NOT_FOUND: ErrorCode
 ERROR_CODE_INVALID_STREAM: ErrorCode
 ERROR_CODE_FEATURE_NOT_AVAILABLE: ErrorCode
 ERROR_CODE_SERVICE_UNAVAILABLE: ErrorCode
+ERROR_CODE_CAPACITY_EXHAUSTED: ErrorCode
 ERROR_CODE_INTERNAL: ErrorCode
 PROTOCOL_VERSION_FIELD_NUMBER: _ClassVar[int]
 protocol_version: _descriptor.FieldDescriptor

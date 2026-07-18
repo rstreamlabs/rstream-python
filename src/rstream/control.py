@@ -106,6 +106,7 @@ class ControlChannel:
         rstream_auth: bool | None = None,
         challenge_mode: bool | None = None,
         hostname: str | None = None,
+        port: int | None = None,
         upstream_tls: bool | None = None,
         auth: TunnelAuth | None = None,
     ) -> BytestreamTunnel:
@@ -127,6 +128,7 @@ class ControlChannel:
             rstream_auth=rstream_auth,
             challenge_mode=challenge_mode,
             hostname=hostname,
+            port=port,
             upstream_tls=upstream_tls,
             auth=auth,
         )
@@ -366,6 +368,40 @@ class ControlChannel:
 
 
 def _normalize_bytestream_options(options: CreateTunnelOptions) -> TunnelProperties:
+    if options.port is not None and options.protocol != "tcp":
+        raise RuntimeError(
+            "A published port requires protocol='tcp'.",
+            code="ERR_RSTREAM_INVALID_TUNNEL",
+        )
+    if options.port is not None and not 1 <= options.port <= 65_535:
+        raise RuntimeError(
+            "The published TCP port must be between 1 and 65535.",
+            code="ERR_RSTREAM_INVALID_TUNNEL",
+        )
+    if options.protocol == "tcp" and options.publish is False:
+        raise RuntimeError(
+            "TCP tunnels must be published.",
+            code="ERR_RSTREAM_INVALID_TUNNEL",
+        )
+    if options.protocol == "tcp" and (
+        options.hostname is not None
+        or options.tls_mode is not None
+        or options.tls_alpns
+        or options.tls_min_version is not None
+        or options.tls_ciphers
+        or options.mtls_auth is not None
+        or options.http_version is not None
+        or options.upstream_tls is not None
+        or options.token_auth is not None
+        or options.rstream_auth is not None
+        or options.challenge_mode is not None
+        or options.auth is not None
+    ):
+        raise RuntimeError(
+            "TCP tunnels do not accept hostname, HTTP, TLS, "
+            "or edge authentication options.",
+            code="ERR_RSTREAM_INVALID_TUNNEL",
+        )
     auth = options.auth
     token_auth = (
         options.token_auth
@@ -391,7 +427,7 @@ def _normalize_bytestream_options(options: CreateTunnelOptions) -> TunnelPropert
     return TunnelProperties(
         name=options.name,
         type="bytestream",
-        publish=options.publish,
+        publish=True if options.protocol == "tcp" else options.publish,
         protocol=options.protocol,
         labels=dict(options.labels),
         geo_ip=tuple(options.geo_ip),
@@ -406,5 +442,6 @@ def _normalize_bytestream_options(options: CreateTunnelOptions) -> TunnelPropert
         rstream_auth=rstream_auth,
         challenge_mode=challenge_mode,
         hostname=options.hostname,
+        port=options.port,
         upstream_tls=options.upstream_tls,
     )
