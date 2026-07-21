@@ -175,6 +175,7 @@ def tunnel_properties_from_json(data: Mapping[str, object]) -> TunnelProperties:
         datagram_guaranteed_delivery=_optional_bool(
             data, "datagram_guaranteed_delivery"
         ),
+        allow_cross_region_routing=_optional_bool(data, "allow_cross_region_routing"),
     )
 
 

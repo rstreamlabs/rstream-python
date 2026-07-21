@@ -59,6 +59,7 @@ class Client:
         api_url: str | None = None,
         config_path: str | None = None,
         context: str | None = None,
+        control_plane_headers: Mapping[str, str] | None = None,
         engine: str | None = None,
         connect_timeout: float = 15.0,
         heartbeat: bool = True,
@@ -67,6 +68,7 @@ class Client:
         no_token: bool | None = None,
         project_endpoint: str | None = None,
         read_config_file: bool = True,
+        region: str | None = None,
         require_token: bool = False,
         token: str | None = None,
         tls: TLSOptions | None = None,
@@ -76,6 +78,7 @@ class Client:
             api_url=api_url,
             config_path=config_path,
             context=context,
+            control_plane_headers=control_plane_headers,
             engine=engine,
             connect_timeout=connect_timeout,
             heartbeat=heartbeat,
@@ -84,6 +87,7 @@ class Client:
             no_token=no_token,
             project_endpoint=project_endpoint,
             read_config_file=read_config_file,
+            region=region,
             require_token=require_token,
             token=token,
             tls=tls,
@@ -101,6 +105,7 @@ class Client:
         api_url: str | None = None,
         config_path: str | None = None,
         context: str | None = None,
+        control_plane_headers: Mapping[str, str] | None = None,
         engine: str | None = None,
         connect_timeout: float = 15.0,
         heartbeat: bool = True,
@@ -109,6 +114,7 @@ class Client:
         no_token: bool | None = None,
         project_endpoint: str | None = None,
         read_config_file: bool = True,
+        region: str | None = None,
         require_token: bool = False,
         token: str | None = None,
         tls: TLSOptions | None = None,
@@ -118,6 +124,7 @@ class Client:
             api_url=api_url,
             config_path=config_path,
             context=context,
+            control_plane_headers=control_plane_headers,
             engine=engine,
             connect_timeout=connect_timeout,
             heartbeat=heartbeat,
@@ -126,6 +133,7 @@ class Client:
             no_token=no_token,
             project_endpoint=project_endpoint,
             read_config_file=read_config_file,
+            region=region,
             require_token=require_token,
             token=token,
             tls=tls,
@@ -380,7 +388,24 @@ class Client:
         request: pb.ProxyConnReq,
     ) -> RstreamStream:
         token = request.secret.value if request.HasField("secret") else None
-        reader, writer = await self._dial_engine(engine, resolved)
+        proxy_engine = engine
+        if request.HasField("proxy_endpoint"):
+            if token is None or not token.strip():
+                raise ProtocolError(
+                    "Engine did not provide credentials for the redirected stream.",
+                    code="ERR_RSTREAM_PROTOCOL",
+                )
+            proxy_engine = request.proxy_endpoint.value.strip()
+            if not proxy_engine:
+                raise ProtocolError(
+                    "Engine returned an empty proxy endpoint.",
+                    code="ERR_RSTREAM_PROTOCOL",
+                )
+        reader, writer = await self._dial_engine(
+            proxy_engine,
+            resolved,
+            use_explicit_server_name=proxy_engine == engine,
+        )
         try:
             await write_message(
                 writer,
@@ -410,8 +435,14 @@ class Client:
         self,
         engine: str,
         resolved: ResolvedClientOptions,
+        *,
+        use_explicit_server_name: bool = True,
     ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        ssl_context, server_hostname = create_ssl_context(engine, resolved.tls)
+        ssl_context, server_hostname = create_ssl_context(
+            engine,
+            resolved.tls,
+            use_explicit_server_name=use_explicit_server_name,
+        )
         host, port = _split_engine(engine)
         return await _wait_for_operation(
             asyncio.open_connection(
@@ -425,7 +456,7 @@ class Client:
         )
 
     async def _resolve_engine(self, resolved: ResolvedClientOptions) -> str:
-        if resolved.engine is not None:
+        if resolved.region is None and resolved.engine is not None:
             return resolved.engine
         if resolved.project_endpoint is None:
             raise ConfigurationError(
@@ -437,9 +468,10 @@ class Client:
         )
         project = await RstreamAPIClient(
             api_url=resolved.api_url,
+            control_plane_headers=resolved.control_plane_headers,
             credentials=credentials,
         ).resolve_tunnels_project(resolved.project_endpoint)
-        return engine_from_project(project)
+        return engine_from_project(project, resolved.region)
 
     async def _resolve_token(
         self,
@@ -479,6 +511,7 @@ class Client:
         api_url: str | None = None,
         config_path: str | None = None,
         context: str | None = None,
+        control_plane_headers: Mapping[str, str] | None = None,
         engine: str | None = None,
         connect_timeout: float | None = None,
         heartbeat: bool | None = None,
@@ -487,6 +520,7 @@ class Client:
         no_token: bool | None = None,
         project_endpoint: str | None = None,
         read_config_file: bool | None = None,
+        region: str | None = None,
         require_token: bool | None = None,
         token: str | None = None,
         tls: TLSOptions | None = None,
@@ -497,6 +531,11 @@ class Client:
             api_url=api_url if api_url is not None else options.api_url,
             config_path=config_path if config_path is not None else options.config_path,
             context=context if context is not None else options.context,
+            control_plane_headers=(
+                control_plane_headers
+                if control_plane_headers is not None
+                else options.control_plane_headers
+            ),
             engine=engine if engine is not None else options.engine,
             connect_timeout=(
                 connect_timeout
@@ -525,6 +564,7 @@ class Client:
                 if read_config_file is not None
                 else options.read_config_file
             ),
+            region=region if region is not None else options.region,
             require_token=(
                 require_token if require_token is not None else options.require_token
             ),

@@ -108,6 +108,7 @@ class ControlChannel:
         hostname: str | None = None,
         port: int | None = None,
         upstream_tls: bool | None = None,
+        allow_cross_region_routing: bool | None = None,
         auth: TunnelAuth | None = None,
     ) -> BytestreamTunnel:
         explicit_options = CreateTunnelOptions(
@@ -130,6 +131,7 @@ class ControlChannel:
             hostname=hostname,
             port=port,
             upstream_tls=upstream_tls,
+            allow_cross_region_routing=allow_cross_region_routing,
             auth=auth,
         )
         if options is not None and explicit_options != CreateTunnelOptions():
@@ -368,6 +370,11 @@ class ControlChannel:
 
 
 def _normalize_bytestream_options(options: CreateTunnelOptions) -> TunnelProperties:
+    if options.allow_cross_region_routing is not None and options.protocol != "tcp":
+        raise RuntimeError(
+            "Cross-region routing policy requires protocol='tcp'.",
+            code="ERR_RSTREAM_INVALID_TUNNEL",
+        )
     if options.port is not None and options.protocol != "tcp":
         raise RuntimeError(
             "A published port requires protocol='tcp'.",
@@ -444,4 +451,5 @@ def _normalize_bytestream_options(options: CreateTunnelOptions) -> TunnelPropert
         hostname=options.hostname,
         port=options.port,
         upstream_tls=options.upstream_tls,
+        allow_cross_region_routing=options.allow_cross_region_routing,
     )
