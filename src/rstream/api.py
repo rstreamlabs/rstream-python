@@ -6,7 +6,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from urllib.parse import quote, urljoin
 
-from rstream.config import DEFAULT_API_URL, normalize_engine_address
+from rstream.config import (
+    DEFAULT_API_URL,
+    _normalize_control_plane_headers,
+    _normalize_region,
+    normalize_engine_address,
+)
 from rstream.errors import ConfigurationError, RuntimeError
 
 
@@ -18,6 +23,16 @@ class TokenCredentials:
 
 
 @dataclass(frozen=True)
+class TunnelsProjectRegionalEndpoint:
+    """Regional engine endpoint authorized for a managed project."""
+
+    provider: str
+    region: str
+    domain: str
+    engine_port: int
+
+
+@dataclass(frozen=True)
 class TunnelsProject:
     """Managed tunnels project metadata required for engine resolution."""
 
@@ -26,6 +41,8 @@ class TunnelsProject:
     url: str | None
     domain: str
     engine_port: int
+    placement: str = "regional"
+    regional_endpoints: tuple[TunnelsProjectRegionalEndpoint, ...] = ()
 
 
 class RstreamAPIClient:
@@ -35,9 +52,13 @@ class RstreamAPIClient:
         self,
         *,
         api_url: str = DEFAULT_API_URL,
+        control_plane_headers: Mapping[str, str] | None = None,
         credentials: TokenCredentials | None = None,
     ) -> None:
         self.api_url = api_url.rstrip("/")
+        self.control_plane_headers = dict(
+            _normalize_control_plane_headers(control_plane_headers)
+        )
         self.credentials = credentials
 
     async def resolve_tunnels_project(self, endpoint: str) -> TunnelsProject:
@@ -66,7 +87,7 @@ class RstreamAPIClient:
                 code="ERR_RSTREAM_INVALID_API_PATH",
             )
         url = urljoin(f"{self.api_url}/", path.lstrip("/"))
-        headers: dict[str, str] = {}
+        headers = dict(self.control_plane_headers)
         if self.credentials is not None:
             headers["Authorization"] = f"Bearer {self.credentials.token}"
         async with httpx.AsyncClient(follow_redirects=False, timeout=15) as client:
@@ -85,7 +106,41 @@ class RstreamAPIClient:
         return {str(key): item for key, item in value.items()}
 
 
-def engine_from_project(project: TunnelsProject) -> str:
+def engine_from_project(project: TunnelsProject, region: str | None = None) -> str:
+    requested = _normalize_region(region)
+    if requested is not None:
+        matches = tuple(
+            endpoint
+            for endpoint in project.regional_endpoints
+            if endpoint.region.strip().lower() == requested
+        )
+        if not matches:
+            available = sorted(
+                {
+                    endpoint.region.strip().lower()
+                    for endpoint in project.regional_endpoints
+                    if endpoint.region.strip()
+                }
+            )
+            suffix = f" Available regions: {', '.join(available)}." if available else ""
+            raise ConfigurationError(
+                f"Region '{requested}' is not available for this project.{suffix}",
+                code="ERR_RSTREAM_REGION_UNAVAILABLE",
+            )
+        if len(matches) > 1:
+            raise ConfigurationError(
+                f"Region '{requested}' is ambiguous for this project.",
+                code="ERR_RSTREAM_REGION_AMBIGUOUS",
+            )
+        selected = matches[0]
+        engine = f"{project.endpoint}.{selected.domain}:{selected.engine_port}"
+        normalized = normalize_engine_address(engine)
+        if normalized is None:
+            raise RuntimeError(
+                "Failed to normalize managed project regional engine address.",
+                code="ERR_RSTREAM_ENGINE_RESOLUTION",
+            )
+        return normalized
     if project.endpoint and project.domain:
         engine = f"{project.endpoint}.{project.domain}:{project.engine_port or 443}"
         normalized = normalize_engine_address(engine)
@@ -110,6 +165,7 @@ def _project_from_json(data: Mapping[str, object]) -> TunnelsProject:
     endpoint = _string_required(data, "endpoint")
     domain = _string_required(data, "domain")
     engine_port = _int_required(data, "enginePort")
+    placement = data.get("placement")
     url = data.get("url")
     return TunnelsProject(
         id=project_id,
@@ -117,7 +173,38 @@ def _project_from_json(data: Mapping[str, object]) -> TunnelsProject:
         url=url if isinstance(url, str) else None,
         domain=domain,
         engine_port=engine_port,
+        placement=placement if isinstance(placement, str) else "regional",
+        regional_endpoints=_regional_endpoints_from_json(data.get("regionalEndpoints")),
     )
+
+
+def _regional_endpoints_from_json(
+    value: object,
+) -> tuple[TunnelsProjectRegionalEndpoint, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise RuntimeError(
+            "Control plane response has invalid 'regionalEndpoints'.",
+            code="ERR_RSTREAM_API_INVALID_RESPONSE",
+        )
+    endpoints: list[TunnelsProjectRegionalEndpoint] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            raise RuntimeError(
+                "Control plane response has invalid 'regionalEndpoints'.",
+                code="ERR_RSTREAM_API_INVALID_RESPONSE",
+            )
+        normalized = {str(key): entry for key, entry in item.items()}
+        endpoints.append(
+            TunnelsProjectRegionalEndpoint(
+                provider=_string_required(normalized, "provider"),
+                region=_string_required(normalized, "region"),
+                domain=_string_required(normalized, "domain"),
+                engine_port=_int_required(normalized, "enginePort"),
+            )
+        )
+    return tuple(endpoints)
 
 
 def _string_required(data: Mapping[str, object], key: str) -> str:

@@ -155,6 +155,10 @@ def tunnel_properties_to_pb(properties: TunnelProperties) -> pb.TunnelProperties
         result.datagram_guaranteed_delivery.CopyFrom(
             BoolValue(value=properties.datagram_guaranteed_delivery)
         )
+    if properties.allow_cross_region_routing is not None:
+        result.allow_cross_region_routing.CopyFrom(
+            BoolValue(value=properties.allow_cross_region_routing)
+        )
     return result
 
 
@@ -205,6 +209,9 @@ def tunnel_properties_from_pb(properties: pb.TunnelProperties) -> TunnelProperti
         ),
         datagram_guaranteed_delivery=wrapper_bool(
             optional_field(properties, "datagram_guaranteed_delivery", BoolValue)
+        ),
+        allow_cross_region_routing=wrapper_bool(
+            optional_field(properties, "allow_cross_region_routing", BoolValue)
         ),
     )
 

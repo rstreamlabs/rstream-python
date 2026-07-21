@@ -96,7 +96,7 @@ class ServerDetails(_message.Message):
     def __init__(self, agent: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., channel: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., plan: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., provider: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., region: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., update: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ...) -> None: ...
 
 class TunnelProperties(_message.Message):
-    __slots__ = ("id", "creation_date", "name", "type", "publish", "protocol", "labels", "geoip", "trusted_ips", "host", "tls_mode", "tls_alpns", "tls_min_version", "tls_ciphers", "mtls_auth", "mtls_cacert_pem", "http_version", "http_use_tls", "token_auth", "rstream_auth", "challenge_mode", "hostname", "port", "upstream_tls", "datagram_guaranteed_delivery")
+    __slots__ = ("id", "creation_date", "name", "type", "publish", "protocol", "labels", "geoip", "trusted_ips", "host", "tls_mode", "tls_alpns", "tls_min_version", "tls_ciphers", "mtls_auth", "mtls_cacert_pem", "http_version", "http_use_tls", "token_auth", "rstream_auth", "challenge_mode", "hostname", "port", "upstream_tls", "datagram_guaranteed_delivery", "allow_cross_region_routing")
     class LabelsEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -129,6 +129,7 @@ class TunnelProperties(_message.Message):
     PORT_FIELD_NUMBER: _ClassVar[int]
     UPSTREAM_TLS_FIELD_NUMBER: _ClassVar[int]
     DATAGRAM_GUARANTEED_DELIVERY_FIELD_NUMBER: _ClassVar[int]
+    ALLOW_CROSS_REGION_ROUTING_FIELD_NUMBER: _ClassVar[int]
     id: _wrappers_pb2.StringValue
     creation_date: _timestamp_pb2.Timestamp
     name: _wrappers_pb2.StringValue
@@ -154,7 +155,8 @@ class TunnelProperties(_message.Message):
     port: _wrappers_pb2.UInt32Value
     upstream_tls: _wrappers_pb2.BoolValue
     datagram_guaranteed_delivery: _wrappers_pb2.BoolValue
-    def __init__(self, id: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., creation_date: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., name: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., type: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., publish: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., protocol: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., labels: _Optional[_Mapping[str, str]] = ..., geoip: _Optional[_Iterable[str]] = ..., trusted_ips: _Optional[_Iterable[str]] = ..., host: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_mode: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_alpns: _Optional[_Iterable[str]] = ..., tls_min_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_ciphers: _Optional[_Iterable[str]] = ..., mtls_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., mtls_cacert_pem: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_use_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., token_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., rstream_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., challenge_mode: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., hostname: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., port: _Optional[_Union[_wrappers_pb2.UInt32Value, _Mapping]] = ..., upstream_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., datagram_guaranteed_delivery: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ...) -> None: ...
+    allow_cross_region_routing: _wrappers_pb2.BoolValue
+    def __init__(self, id: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., creation_date: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., name: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., type: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., publish: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., protocol: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., labels: _Optional[_Mapping[str, str]] = ..., geoip: _Optional[_Iterable[str]] = ..., trusted_ips: _Optional[_Iterable[str]] = ..., host: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_mode: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_alpns: _Optional[_Iterable[str]] = ..., tls_min_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_ciphers: _Optional[_Iterable[str]] = ..., mtls_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., mtls_cacert_pem: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_use_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., token_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., rstream_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., challenge_mode: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., hostname: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., port: _Optional[_Union[_wrappers_pb2.UInt32Value, _Mapping]] = ..., upstream_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., datagram_guaranteed_delivery: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., allow_cross_region_routing: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ...) -> None: ...
 
 class OpenControlChannelReq(_message.Message):
     __slots__ = ("client_details",)
@@ -216,16 +218,18 @@ class CloseTunnelRsp(_message.Message):
     def __init__(self, tunnel_id: _Optional[str] = ...) -> None: ...
 
 class ProxyConnReq(_message.Message):
-    __slots__ = ("tunnel_id", "stream_id", "secret", "source_ip")
+    __slots__ = ("tunnel_id", "stream_id", "secret", "source_ip", "proxy_endpoint")
     TUNNEL_ID_FIELD_NUMBER: _ClassVar[int]
     STREAM_ID_FIELD_NUMBER: _ClassVar[int]
     SECRET_FIELD_NUMBER: _ClassVar[int]
     SOURCE_IP_FIELD_NUMBER: _ClassVar[int]
+    PROXY_ENDPOINT_FIELD_NUMBER: _ClassVar[int]
     tunnel_id: str
     stream_id: str
     secret: _wrappers_pb2.StringValue
     source_ip: IpAddress
-    def __init__(self, tunnel_id: _Optional[str] = ..., stream_id: _Optional[str] = ..., secret: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., source_ip: _Optional[_Union[IpAddress, _Mapping]] = ...) -> None: ...
+    proxy_endpoint: _wrappers_pb2.StringValue
+    def __init__(self, tunnel_id: _Optional[str] = ..., stream_id: _Optional[str] = ..., secret: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., source_ip: _Optional[_Union[IpAddress, _Mapping]] = ..., proxy_endpoint: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ...) -> None: ...
 
 class ProxyConnRsp(_message.Message):
     __slots__ = ("stream_id", "error")

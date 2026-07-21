@@ -38,14 +38,27 @@ async def test_published_tcp_options_and_local_validation(tmp_path: Path) -> Non
         client = client_for(engine)
 
         async with await client.connect() as control:
-            tunnel = await control.create_tunnel(protocol="tcp", port=10042)
+            tunnel = await control.create_tunnel(
+                protocol="tcp",
+                port=10042,
+                allow_cross_region_routing=True,
+            )
             assert tunnel.forwarding_address == "test.localhost:10042 (tcp)"
+            assert tunnel.properties.allow_cross_region_routing is True
             with pytest.raises(
                 rstream.RstreamRuntimeError, match="do not accept"
             ) as exc:
                 await control.create_tunnel(
                     protocol="tcp",
                     hostname="ssh.example.test",
+                )
+            assert exc.value.code == "ERR_RSTREAM_INVALID_TUNNEL"
+            with pytest.raises(
+                rstream.RstreamRuntimeError, match="requires protocol='tcp'"
+            ) as exc:
+                await control.create_tunnel(
+                    protocol="http",
+                    allow_cross_region_routing=True,
                 )
             assert exc.value.code == "ERR_RSTREAM_INVALID_TUNNEL"
 
@@ -213,6 +226,88 @@ async def test_proxy_connection_delivery_round_trip(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_proxy_connection_can_dial_ingress_engine(tmp_path: Path) -> None:
+    ca = trustme.CA()
+    async with (
+        await FakeEngine.start(tmp_path, name="owner", ca=ca) as owner,
+        await FakeEngine.start(tmp_path, name="ingress", ca=ca) as ingress,
+    ):
+        client = client_for(owner, token="owner-pat", zero_rtt=False)
+        async with await client.connect() as control:
+            tunnel = await control.create_tunnel()
+            response_waiter = asyncio.create_task(
+                owner.request_proxy_connection(
+                    tunnel.id,
+                    "stream_direct_1",
+                    proxy_endpoint=ingress.address,
+                )
+            )
+            app_stream = await asyncio.wait_for(tunnel.accept(), timeout=1)
+            ingress_stream = await ingress.next_proxy_stream()
+            response = await response_waiter
+            assert not response.proxy_conn_rsp.HasField("error")
+            assert owner.proxy_requests == []
+            assert ingress.proxy_requests == [("stream_direct_1", False)]
+            assert ingress.proxy_tokens == ["stream-secret"]
+            app_stream.write(b"ping")
+            await app_stream.drain()
+            assert await ingress_stream.readexactly(4) == b"ping"
+            app_stream.close()
+            ingress_stream.close()
+            await asyncio.gather(
+                app_stream.wait_closed(),
+                ingress_stream.wait_closed(),
+                return_exceptions=True,
+            )
+
+
+@pytest.mark.asyncio
+async def test_proxy_redirect_without_stream_secret_is_rejected(tmp_path: Path) -> None:
+    ca = trustme.CA()
+    async with (
+        await FakeEngine.start(tmp_path, name="owner", ca=ca) as owner,
+        await FakeEngine.start(tmp_path, name="ingress", ca=ca) as ingress,
+    ):
+        client = client_for(owner)
+        async with await client.connect() as control:
+            tunnel = await control.create_tunnel()
+            response = await owner.request_proxy_connection(
+                tunnel.id,
+                "stream_missing_secret",
+                proxy_endpoint=ingress.address,
+                include_secret=False,
+            )
+            assert response.proxy_conn_rsp.HasField("error")
+            assert "credentials" in response.proxy_conn_rsp.error.message.value
+            assert owner.proxy_requests == []
+            assert ingress.proxy_requests == []
+
+
+@pytest.mark.asyncio
+async def test_proxy_redirect_with_empty_stream_secret_is_rejected(
+    tmp_path: Path,
+) -> None:
+    ca = trustme.CA()
+    async with (
+        await FakeEngine.start(tmp_path, name="owner", ca=ca) as owner,
+        await FakeEngine.start(tmp_path, name="ingress", ca=ca) as ingress,
+    ):
+        client = client_for(owner)
+        async with await client.connect() as control:
+            tunnel = await control.create_tunnel()
+            response = await owner.request_proxy_connection(
+                tunnel.id,
+                "stream_empty_secret",
+                proxy_endpoint=ingress.address,
+                secret="",
+            )
+            assert response.proxy_conn_rsp.HasField("error")
+            assert "credentials" in response.proxy_conn_rsp.error.message.value
+            assert owner.proxy_requests == []
+            assert ingress.proxy_requests == []
+
+
+@pytest.mark.asyncio
 async def test_proxy_handshake_timeout_is_reported_to_engine(
     tmp_path: Path,
 ) -> None:
@@ -262,13 +357,15 @@ def client_for(
     engine: FakeEngine,
     *,
     operation_timeout: float = 1,
+    token: str | None = None,
     zero_rtt: bool = False,
 ) -> rstream.Client:
     return rstream.Client(
         engine=engine.address,
-        no_token=True,
+        no_token=token is None,
         operation_timeout=operation_timeout,
         read_config_file=False,
+        token=token,
         tls=rstream.TLSOptions(
             ca_file=str(engine.ca_file),
             server_name="localhost",
@@ -298,6 +395,7 @@ class FakeEngine:
         self.open_tunnel_requests = 0
         self.stream_requests: list[tuple[str, bool]] = []
         self.proxy_requests: list[tuple[str, bool]] = []
+        self.proxy_tokens: list[str | None] = []
         self._control_writer: asyncio.StreamWriter | None = None
         self._pending_proxy_responses: asyncio.Queue[pb.Message] = asyncio.Queue()
         self._proxy_streams: asyncio.Queue[rstream.RstreamStream] = asyncio.Queue()
@@ -307,13 +405,19 @@ class FakeEngine:
         self._closed_event = asyncio.Event()
 
     @classmethod
-    async def start(cls, tmp_path: Path) -> FakeEngine:
-        ca = trustme.CA()
-        cert = ca.issue_cert("localhost", "127.0.0.1")
-        ca_file = tmp_path / "ca.pem"
-        cert_file = tmp_path / "cert.pem"
-        key_file = tmp_path / "key.pem"
-        ca.cert_pem.write_to_path(ca_file)
+    async def start(
+        cls,
+        tmp_path: Path,
+        *,
+        name: str = "engine",
+        ca: trustme.CA | None = None,
+    ) -> FakeEngine:
+        certificate_authority = ca or trustme.CA()
+        cert = certificate_authority.issue_cert("localhost", "127.0.0.1")
+        ca_file = tmp_path / f"{name}-ca.pem"
+        cert_file = tmp_path / f"{name}-cert.pem"
+        key_file = tmp_path / f"{name}-key.pem"
+        certificate_authority.cert_pem.write_to_path(ca_file)
         cert.cert_chain_pems[0].write_to_path(cert_file)
         cert.private_key_pem.write_to_path(key_file)
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -360,12 +464,22 @@ class FakeEngine:
         self,
         tunnel_id: str,
         stream_id: str,
+        *,
+        proxy_endpoint: str | None = None,
+        include_secret: bool = True,
+        secret: str = "stream-secret",
     ) -> pb.Message:
         writer = self._control_writer
         assert writer is not None
         message = pb.Message()
         message.proxy_conn_req.tunnel_id = tunnel_id
         message.proxy_conn_req.stream_id = stream_id
+        if proxy_endpoint is not None:
+            message.proxy_conn_req.proxy_endpoint.CopyFrom(
+                StringValue(value=proxy_endpoint)
+            )
+        if include_secret:
+            message.proxy_conn_req.secret.CopyFrom(StringValue(value=secret))
         await write_message(writer, message)
         return await asyncio.wait_for(self._pending_proxy_responses.get(), timeout=1)
 
@@ -465,6 +579,10 @@ class FakeEngine:
             response.open_tunnel_rsp.tunnel_properties.port.CopyFrom(
                 request.tunnel_properties.port
             )
+        if request.tunnel_properties.HasField("allow_cross_region_routing"):
+            response.open_tunnel_rsp.tunnel_properties.allow_cross_region_routing.CopyFrom(
+                request.tunnel_properties.allow_cross_region_routing
+            )
         await write_message(writer, response)
 
     async def _handle_close_tunnel(
@@ -519,6 +637,11 @@ class FakeEngine:
     ) -> None:
         zero_rtt = request.HasField("zero_rtt") and request.zero_rtt.value
         self.proxy_requests.append((request.stream_id, zero_rtt))
+        self.proxy_tokens.append(
+            request.client_details.token.value
+            if request.client_details.HasField("token")
+            else None
+        )
         if self._consume("next_proxy_hang"):
             await self._hold()
         if not zero_rtt:

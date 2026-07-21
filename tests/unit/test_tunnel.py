@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import cast
 
@@ -82,6 +83,33 @@ async def test_tunnel_close_delegates_to_control_channel() -> None:
 
 
 @pytest.mark.asyncio
+async def test_tunnel_close_waits_for_forwarders() -> None:
+    control = _ClosingControl()
+    tunnel = BytestreamTunnel(control, TunnelProperties(id="tun_123"))
+    control.tunnel = tunnel
+    started = asyncio.Event()
+    stopped = asyncio.Event()
+
+    async def forwarder() -> None:
+        started.set()
+        try:
+            await asyncio.Future()
+        finally:
+            await asyncio.sleep(0)
+            stopped.set()
+
+    task = asyncio.create_task(forwarder())
+    tunnel._forward_tasks.add(task)
+    task.add_done_callback(tunnel._forward_tasks.discard)
+    await started.wait()
+
+    await tunnel.close()
+
+    assert stopped.is_set()
+    assert task.done()
+
+
+@pytest.mark.asyncio
 async def test_tunnel_accepts_delivered_stream() -> None:
     stream = _stream_double()
     tunnel = BytestreamTunnel(_Control(), TunnelProperties(id="tun_123"))
@@ -139,6 +167,16 @@ class _Control:
 
     async def close_tunnel(self, tunnel_id: str) -> None:
         self.closed_tunnels.append(tunnel_id)
+
+
+@dataclass
+class _ClosingControl(_Control):
+    tunnel: BytestreamTunnel | None = None
+
+    async def close_tunnel(self, tunnel_id: str) -> None:
+        await super().close_tunnel(tunnel_id)
+        assert self.tunnel is not None
+        self.tunnel.on_close()
 
 
 class _WriterDouble:

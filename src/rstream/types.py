@@ -50,6 +50,7 @@ class TunnelProperties:
     port: int | None = None
     upstream_tls: bool | None = None
     datagram_guaranteed_delivery: bool | None = None
+    allow_cross_region_routing: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,7 @@ class CreateTunnelOptions:
     hostname: str | None = None
     port: int | None = None
     upstream_tls: bool | None = None
+    allow_cross_region_routing: bool | None = None
     auth: TunnelAuth | None = None
 
 
