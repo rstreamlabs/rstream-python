@@ -53,16 +53,13 @@ async def test_published_tcp_options_and_local_validation(tmp_path: Path) -> Non
                     hostname="ssh.example.test",
                 )
             assert exc.value.code == "ERR_RSTREAM_INVALID_TUNNEL"
-            with pytest.raises(
-                rstream.RstreamRuntimeError, match="requires protocol='tcp'"
-            ) as exc:
-                await control.create_tunnel(
-                    protocol="http",
-                    allow_cross_region_routing=True,
-                )
-            assert exc.value.code == "ERR_RSTREAM_INVALID_TUNNEL"
+            http_tunnel = await control.create_tunnel(
+                protocol="http",
+                allow_cross_region_routing=True,
+            )
+            assert http_tunnel.properties.allow_cross_region_routing is True
 
-        assert engine.open_tunnel_requests == 1
+        assert engine.open_tunnel_requests == 2
 
 
 @pytest.mark.asyncio
