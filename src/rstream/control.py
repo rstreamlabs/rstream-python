@@ -370,11 +370,6 @@ class ControlChannel:
 
 
 def _normalize_bytestream_options(options: CreateTunnelOptions) -> TunnelProperties:
-    if options.allow_cross_region_routing is not None and options.protocol != "tcp":
-        raise RuntimeError(
-            "Cross-region routing policy requires protocol='tcp'.",
-            code="ERR_RSTREAM_INVALID_TUNNEL",
-        )
     if options.port is not None and options.protocol != "tcp":
         raise RuntimeError(
             "A published port requires protocol='tcp'.",
