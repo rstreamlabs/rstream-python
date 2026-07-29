@@ -103,6 +103,6 @@ pytest
 python -m build
 ```
 
-Also run at least one real-engine e2e command from [TESTING.md](TESTING.md)
+Also run at least one real-engine e2e command from [TESTING.md](004-testing.md)
 against a local or managed engine and record the command in the release notes or
 PR description.
