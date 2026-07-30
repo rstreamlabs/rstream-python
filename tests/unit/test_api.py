@@ -20,6 +20,7 @@ def test_engine_from_project_uses_endpoint_domain_and_port() -> None:
         url=None,
         domain="tunnels.rstream.io",
         engine_port=9443,
+        routing="regional",
     )
 
     assert engine_from_project(project) == "abc123.tunnels.rstream.io:9443"
@@ -32,6 +33,7 @@ def test_engine_from_project_falls_back_to_url() -> None:
         url="engine.example.test:443",
         domain="",
         engine_port=443,
+        routing="regional",
     )
 
     assert engine_from_project(project) == "engine.example.test:443"
@@ -44,6 +46,7 @@ def test_engine_from_project_rejects_unresolvable_project() -> None:
         url=None,
         domain="",
         engine_port=443,
+        routing="regional",
     )
 
     with pytest.raises(RstreamRuntimeError, match="Failed to resolve"):
@@ -57,7 +60,7 @@ def test_engine_from_project_selects_only_authorized_regions() -> None:
         url="abc123.global.example.test:443",
         domain="global.example.test",
         engine_port=443,
-        placement="global",
+        routing="global",
         regional_endpoints=(
             TunnelsProjectRegionalEndpoint(
                 provider="aws",
@@ -92,6 +95,7 @@ def test_engine_from_project_rejects_ambiguous_regions() -> None:
         url=None,
         domain="global.example.test",
         engine_port=443,
+        routing="global",
         regional_endpoints=(endpoint, endpoint),
     )
 
@@ -107,7 +111,7 @@ def test_project_from_json_normalizes_control_plane_payload() -> None:
             "url": "engine.example.test:443",
             "domain": "tunnels.rstream.io",
             "enginePort": 9443,
-            "placement": "global",
+            "routing": "global",
             "regionalEndpoints": [
                 {
                     "provider": "aws",
@@ -124,7 +128,7 @@ def test_project_from_json_normalizes_control_plane_payload() -> None:
     assert project.url == "engine.example.test:443"
     assert project.domain == "tunnels.rstream.io"
     assert project.engine_port == 9443
-    assert project.placement == "global"
+    assert project.routing == "global"
     assert project.regional_endpoints[0].region == "eu-west-3"
 
 
@@ -141,6 +145,13 @@ def test_project_from_json_normalizes_control_plane_payload() -> None:
             "endpoint": "abc",
             "domain": "example.test",
             "enginePort": 70_000,
+            "routing": "regional",
+        },
+        {
+            "id": "project",
+            "endpoint": "abc",
+            "domain": "example.test",
+            "enginePort": 443,
         },
     ],
 )
