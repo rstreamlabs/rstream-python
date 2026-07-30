@@ -41,7 +41,7 @@ class TunnelsProject:
     url: str | None
     domain: str
     engine_port: int
-    placement: str = "regional"
+    routing: str
     regional_endpoints: tuple[TunnelsProjectRegionalEndpoint, ...] = ()
 
 
@@ -165,7 +165,6 @@ def _project_from_json(data: Mapping[str, object]) -> TunnelsProject:
     endpoint = _string_required(data, "endpoint")
     domain = _string_required(data, "domain")
     engine_port = _int_required(data, "enginePort")
-    placement = data.get("placement")
     url = data.get("url")
     return TunnelsProject(
         id=project_id,
@@ -173,7 +172,7 @@ def _project_from_json(data: Mapping[str, object]) -> TunnelsProject:
         url=url if isinstance(url, str) else None,
         domain=domain,
         engine_port=engine_port,
-        placement=placement if isinstance(placement, str) else "regional",
+        routing=_string_required(data, "routing"),
         regional_endpoints=_regional_endpoints_from_json(data.get("regionalEndpoints")),
     )
 
