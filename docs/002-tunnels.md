@@ -188,8 +188,10 @@ async with rstream.Client.from_env() as client:
     hostname = await client.generate_stable_hostname()
     async with await client.connect() as control:
         tunnel = await control.create_tunnel(
-            protocol="http", http_version="http/1.1",
-            publish=True, hostname=hostname,
+            protocol="http",
+            http_version="http/1.1",
+            publish=True,
+            hostname=hostname,
         )
 ```
 

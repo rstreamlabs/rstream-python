@@ -33,6 +33,7 @@ def test_tunnel_properties_round_trip() -> None:
         hostname="api.example.test",
         port=443,
         datagram_guaranteed_delivery=True,
+        allow_cross_region_routing=True,
     )
 
     decoded = tunnel_properties_from_pb(tunnel_properties_to_pb(properties))
@@ -48,6 +49,7 @@ def test_tunnel_properties_round_trip() -> None:
     assert decoded.hostname == "api.example.test"
     assert decoded.port == 443
     assert decoded.datagram_guaranteed_delivery is True
+    assert decoded.allow_cross_region_routing is True
 
 
 def test_published_tcp_properties_round_trip() -> None:
@@ -56,12 +58,14 @@ def test_published_tcp_properties_round_trip() -> None:
         publish=True,
         protocol="tcp",
         port=10042,
+        allow_cross_region_routing=False,
     )
 
     decoded = tunnel_properties_from_pb(tunnel_properties_to_pb(properties))
 
     assert decoded.protocol == "tcp"
     assert decoded.port == 10042
+    assert decoded.allow_cross_region_routing is False
 
 
 def test_message_encoding_prefixes_payload_length() -> None:

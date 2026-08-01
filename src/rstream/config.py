@@ -39,6 +39,7 @@ class ClientOptions:
     api_url: str | None = None
     config_path: str | None = None
     context: str | None = None
+    control_plane_headers: Mapping[str, str] | None = None
     engine: str | None = None
     connect_timeout: float = 15.0
     heartbeat: bool = True
@@ -47,6 +48,7 @@ class ClientOptions:
     no_token: bool | None = None
     project_endpoint: str | None = None
     read_config_file: bool = True
+    region: str | None = None
     require_token: bool = False
     tls: TLSOptions | None = None
     token: str | None = None
@@ -59,6 +61,7 @@ class ResolvedClientOptions:
     """Fully resolved options used by the runtime client."""
 
     api_url: str
+    control_plane_headers: Mapping[str, str]
     engine: str | None
     connect_timeout: float
     heartbeat: bool
@@ -66,6 +69,7 @@ class ResolvedClientOptions:
     operation_timeout: float
     no_token: bool
     project_endpoint: str | None
+    region: str | None
     tls: TLSOptions | None
     token: str | None
     zero_rtt: bool
@@ -105,6 +109,7 @@ class _TransportConfig:
 class _EnvironmentConfig:
     api_url: str
     auth: _AuthConfig | None = None
+    headers: Mapping[str, str] = field(default_factory=dict)
     transport: _TransportConfig | None = None
 
 
@@ -115,6 +120,7 @@ class _ContextConfig:
     auth: _AuthConfig | None = None
     engine: str | None = None
     project_endpoint: str | None = None
+    region: str | None = None
     transport: _TransportConfig | None = None
 
 
@@ -128,9 +134,11 @@ class _ConfigFile:
 @dataclass(frozen=True)
 class _ResolvedConfig:
     api_url: str
+    control_plane_headers: Mapping[str, str] = field(default_factory=dict)
     context_engine: str | None = None
     engine: str | None = None
     project_endpoint: str | None = None
+    region: str | None = None
     tls: TLSOptions | None = None
     token: str | None = None
     tunnel_transport: str | None = None
@@ -141,15 +149,33 @@ class _EnvSettings:
     api_url: str | None = None
     config_path: str | None = None
     context: str | None = None
+    control_plane_headers: Mapping[str, str] = field(default_factory=dict)
     engine: str | None = None
     mtls_cert: str | None = None
     mtls_key: str | None = None
+    region: str | None = None
     token: str | None = None
     tunnel_transport: str | None = None
     use_quic: bool | None = None
 
 
 _DNS_LABEL_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", re.I)
+_HEADER_NAME_PATTERN = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
+_RESERVED_CONTROL_PLANE_HEADERS = {
+    "authorization",
+    "connection",
+    "content-length",
+    "cookie",
+    "forwarded",
+    "host",
+    "keep-alive",
+    "proxy-authorization",
+    "proxy-connection",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
+}
 
 
 def default_config_path() -> str:
@@ -203,9 +229,27 @@ async def resolve_client_options(options: ClientOptions) -> ResolvedClientOption
             "operation_timeout must be positive.",
             code="ERR_RSTREAM_INVALID_TIMEOUT",
         )
+    region = _normalize_region(
+        _first_defined(options.region, env.region, config.region)
+    )
+    explicit_engine = _normalize_optional(_first_defined(options.engine, env.engine))
+    project_endpoint = _normalize_optional(
+        _first_defined(options.project_endpoint, config.project_endpoint)
+    )
+    if region is not None and explicit_engine is not None:
+        raise ConfigurationError(
+            "Region selection cannot be combined with an explicit engine override.",
+            code="ERR_RSTREAM_REGION_ENGINE_CONFLICT",
+        )
+    if region is not None and project_endpoint is None:
+        raise ConfigurationError(
+            "Managed project endpoint is required for region selection.",
+            code="ERR_RSTREAM_PROJECT_ENDPOINT_REQUIRED",
+        )
     return ResolvedClientOptions(
         api_url=_first_defined(options.api_url, env.api_url, config.api_url)
         or DEFAULT_API_URL,
+        control_plane_headers=dict(config.control_plane_headers),
         engine=normalize_engine_address(
             _first_defined(
                 options.engine,
@@ -221,9 +265,8 @@ async def resolve_client_options(options: ClientOptions) -> ResolvedClientOption
         no_token=options.no_token
         if options.no_token is not None
         else token is None and not _tls_has_client_certificate(tls),
-        project_endpoint=_normalize_optional(
-            _first_defined(options.project_endpoint, config.project_endpoint)
-        ),
+        project_endpoint=project_endpoint,
+        region=region,
         tls=tls,
         token=token,
         zero_rtt=options.zero_rtt,
@@ -234,11 +277,13 @@ async def resolve_client_options(options: ClientOptions) -> ResolvedClientOption
 def create_ssl_context(
     engine: str,
     options: TLSOptions | None,
+    *,
+    use_explicit_server_name: bool = True,
 ) -> tuple[ssl.SSLContext, str | None]:
     parsed_host = engine.split(":", 1)[0]
     server_name = (
         options.server_name
-        if options is not None and options.server_name
+        if use_explicit_server_name and options is not None and options.server_name
         else parsed_host
     )
     context = ssl.create_default_context(cafile=options.ca_file if options else None)
@@ -296,13 +341,32 @@ def normalize_engine_address(engine: str | None) -> str | None:
     return f"{hostname.lower()}{f':{parsed.port}' if parsed.port else ''}"
 
 
+def _normalize_region(region: str | None) -> str | None:
+    normalized = _normalize_optional(region)
+    if normalized is None or normalized.lower() == "auto":
+        return None
+    value = normalized.lower()
+    if len(value) > 64 or not re.fullmatch(
+        r"[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?", value
+    ):
+        raise ConfigurationError(
+            "Region can only contain letters, numbers, dots, underscores, or hyphens.",
+            code="ERR_RSTREAM_INVALID_REGION",
+        )
+    return value
+
+
 def _resolve_config(
     options: ClientOptions,
     env: _EnvSettings,
 ) -> _ResolvedConfig:
     if not options.read_config_file:
         return _ResolvedConfig(
-            api_url=_first_defined(options.api_url, env.api_url) or DEFAULT_API_URL
+            api_url=_first_defined(options.api_url, env.api_url) or DEFAULT_API_URL,
+            control_plane_headers=_merge_control_plane_headers(
+                env.control_plane_headers,
+                options.control_plane_headers,
+            ),
         )
     config_path = (
         _normalize_optional(_first_defined(options.config_path, env.config_path))
@@ -365,9 +429,15 @@ def _resolve_config(
         tunnel_transport = _transport_mode_from_config(environment_transport)
     return _ResolvedConfig(
         api_url=api_url,
+        control_plane_headers=_merge_control_plane_headers(
+            environment.headers if environment else None,
+            env.control_plane_headers,
+            options.control_plane_headers,
+        ),
         context_engine=context.engine if context else None,
         engine=explicit_engine,
         project_endpoint=context.project_endpoint if context else None,
+        region=context.region if context else None,
         tls=tls,
         token=token,
         tunnel_transport=tunnel_transport,
@@ -380,6 +450,9 @@ def _read_env() -> _EnvSettings:
         api_url=_normalize_api_url(os.getenv("RSTREAM_API_URL")),
         config_path=_normalize_optional(os.getenv("RSTREAM_CONFIG")),
         context=_normalize_optional(os.getenv("RSTREAM_CONTEXT")),
+        control_plane_headers=_control_plane_headers_from_json(
+            os.getenv("RSTREAM_CONTROL_PLANE_HEADERS")
+        ),
         engine=_normalize_optional(
             _first_defined(
                 os.getenv("RSTREAM_ENGINE"),
@@ -388,6 +461,7 @@ def _read_env() -> _EnvSettings:
         ),
         mtls_cert=_normalize_optional(os.getenv("RSTREAM_MTLS_CERT_FILE")),
         mtls_key=_normalize_optional(os.getenv("RSTREAM_MTLS_KEY_FILE")),
+        region=_normalize_optional(os.getenv("RSTREAM_REGION")),
         token=_normalize_optional(os.getenv("RSTREAM_AUTHENTICATION_TOKEN")),
         tunnel_transport=_normalize_optional(os.getenv("RSTREAM_TUNNEL_TRANSPORT")),
         use_quic=None if legacy_quic is None else legacy_quic == "1",
@@ -442,6 +516,7 @@ def _context_config(value: Mapping[str, object]) -> _ContextConfig:
         auth=_auth_config(value.get("auth")),
         engine=_normalize_optional(_string(value.get("engine"))),
         project_endpoint=_normalize_optional(_string(value.get("projectEndpoint"))),
+        region=_normalize_optional(_string(value.get("region"))),
         transport=_transport_config(value.get("transport")),
     )
 
@@ -450,6 +525,7 @@ def _environment_config(value: Mapping[str, object]) -> _EnvironmentConfig:
     return _EnvironmentConfig(
         api_url=_normalize_api_url(_string(value.get("apiUrl"))) or "",
         auth=_auth_config(value.get("auth")),
+        headers=_control_plane_headers_config(value.get("headers")),
         transport=_transport_config(value.get("transport")),
     )
 
@@ -664,6 +740,89 @@ def _merge_tls_options(
         insecure_skip_verify=explicit.insecure_skip_verify
         or inherited.insecure_skip_verify,
     )
+
+
+def _merge_control_plane_headers(
+    *sources: Mapping[str, str] | None,
+) -> Mapping[str, str]:
+    merged: dict[str, str] = {}
+    for source in sources:
+        merged.update(_normalize_control_plane_headers(source))
+    return merged
+
+
+def _control_plane_headers_from_json(value: str | None) -> Mapping[str, str]:
+    normalized = _normalize_optional(value)
+    if normalized is None:
+        return {}
+    try:
+        parsed: object = json.loads(normalized)
+    except json.JSONDecodeError as error:
+        raise ConfigurationError(
+            "RSTREAM_CONTROL_PLANE_HEADERS must be a JSON object of string values.",
+            code="ERR_RSTREAM_INVALID_CONFIG",
+        ) from error
+    return _control_plane_headers_config(parsed)
+
+
+def _control_plane_headers_config(value: object) -> Mapping[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ConfigurationError(
+            "Control plane headers must be an object of string values.",
+            code="ERR_RSTREAM_INVALID_CONFIG",
+        )
+    headers: dict[str, str] = {}
+    for name, header_value in value.items():
+        if not isinstance(name, str) or not isinstance(header_value, str):
+            raise ConfigurationError(
+                "Control plane headers must be an object of string values.",
+                code="ERR_RSTREAM_INVALID_CONFIG",
+            )
+        headers[name] = header_value
+    return _normalize_control_plane_headers(headers)
+
+
+def _normalize_control_plane_headers(
+    headers: Mapping[str, str] | None,
+) -> Mapping[str, str]:
+    normalized: dict[str, str] = {}
+    for raw_name, value in (headers or {}).items():
+        if not isinstance(raw_name, str) or not isinstance(value, str):
+            raise ConfigurationError(
+                "Control plane headers must contain string names and values.",
+                code="ERR_RSTREAM_INVALID_CONFIG",
+            )
+        name = raw_name.strip()
+        lower_name = name.lower()
+        if not _HEADER_NAME_PATTERN.fullmatch(name):
+            raise ConfigurationError(
+                f"Invalid control plane header name '{raw_name}'.",
+                code="ERR_RSTREAM_INVALID_CONFIG",
+            )
+        if lower_name in _RESERVED_CONTROL_PLANE_HEADERS or lower_name.startswith(
+            "x-forwarded-"
+        ):
+            raise ConfigurationError(
+                f"Control plane header '{raw_name}' is reserved.",
+                code="ERR_RSTREAM_INVALID_CONFIG",
+            )
+        if "\r" in value or "\n" in value:
+            raise ConfigurationError(
+                f"Control plane header '{raw_name}' has an invalid value.",
+                code="ERR_RSTREAM_INVALID_CONFIG",
+            )
+        canonical_name = "-".join(
+            part[:1].upper() + part[1:].lower() for part in name.split("-")
+        )
+        if canonical_name in normalized:
+            raise ConfigurationError(
+                f"Duplicate control plane header '{canonical_name}'.",
+                code="ERR_RSTREAM_INVALID_CONFIG",
+            )
+        normalized[canonical_name] = value
+    return normalized
 
 
 def _validate_token_expiry(token: str) -> None:
