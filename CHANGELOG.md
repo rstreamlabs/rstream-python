@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.0](https://github.com/rstreamlabs/rstream-python/compare/v0.4.0...v0.5.0) (2026-08-01)
+
+
+### Features
+
+* **edge:** release region-aware Python tunnels ([61250d2](https://github.com/rstreamlabs/rstream-python/commit/61250d2750d090434d01eee1c1da3495c348506b))
+* **edge:** support region-aware tunnels ([095356a](https://github.com/rstreamlabs/rstream-python/commit/095356a17d6a841d460f82453c837e8e3b4b3b45))
+
+
+### Bug Fixes
+
+* **api:** align project routing metadata ([1f7d26a](https://github.com/rstreamlabs/rstream-python/commit/1f7d26a7de428e6e6a32c8fac523858626927f85))
+* **edge:** allow cross-region routing for every protocol ([7626e8d](https://github.com/rstreamlabs/rstream-python/commit/7626e8dc0f815182393d423a09add57333673c31))
+
+
+### Documentation
+
+* organize internal documentation ([b46829d](https://github.com/rstreamlabs/rstream-python/commit/b46829d97e05403cb5c4b24260a8701bc1f9b509))
+
 ## [0.4.0](https://github.com/rstreamlabs/rstream-python/compare/v0.3.0...v0.4.0) (2026-07-18)
 
 
