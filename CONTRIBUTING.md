@@ -57,7 +57,7 @@ Use the smallest test that exercises the behavior:
 - framework example tests when changing sample integrations;
 - opt-in e2e tests for real engines and managed environments.
 
-See [docs/TESTING.md](docs/TESTING.md) for the e2e matrix.
+See [docs/004-testing.md](docs/004-testing.md) for the e2e matrix.
 
 ## Generated code
 

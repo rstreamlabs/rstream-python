@@ -67,8 +67,12 @@ class BytestreamTunnel:
 
     async def close(self) -> None:
         if self._closed:
+            await self.wait_forwarders_closed()
             return
-        await self._control.close_tunnel(self.id)
+        try:
+            await self._control.close_tunnel(self.id)
+        finally:
+            await self.wait_forwarders_closed()
 
     async def forward_to(self, host: str, port: int) -> None:
         _validate_local_endpoint(host, port)
