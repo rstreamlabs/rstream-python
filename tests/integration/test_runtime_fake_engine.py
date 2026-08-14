@@ -67,9 +67,12 @@ async def test_negotiated_liveness_tolerates_a_dropped_heartbeat(
     ) as engine:
         control = await client_for(engine, heartbeat_interval=1.0).connect()
 
-        await asyncio.sleep(3.2)
-        assert not control.closed
-        assert len(engine.heartbeats) >= 4
+        for sequence in range(1, 5):
+            heartbeat = await asyncio.wait_for(
+                engine.observed_heartbeats.get(), timeout=2.0
+            )
+            assert heartbeat.sequence == sequence
+            assert not control.closed
 
         await control.close()
 
@@ -635,6 +638,7 @@ class FakeEngine:
         self.duplicate_heartbeat_acknowledgement = False
         self.open_control_request: pb.OpenControlChannelReq | None = None
         self.heartbeats: list[pb.Heartbeat] = []
+        self.observed_heartbeats: asyncio.Queue[pb.Heartbeat] = asyncio.Queue()
         self.first_heartbeat = asyncio.Event()
 
     @classmethod
@@ -804,6 +808,7 @@ class FakeEngine:
                 heartbeat = pb.Heartbeat()
                 heartbeat.CopyFrom(message.heartbeat)
                 self.heartbeats.append(heartbeat)
+                await self.observed_heartbeats.put(heartbeat)
                 self.first_heartbeat.set()
                 if self.acknowledge_heartbeats:
                     if len(self.heartbeats) % self.heartbeat_acknowledgement_every != 0:
