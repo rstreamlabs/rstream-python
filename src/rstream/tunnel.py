@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from contextlib import suppress
 from typing import Protocol
 
@@ -11,6 +12,52 @@ from rstream.stream import RstreamStream, pipe_stream_to_local
 from rstream.types import TunnelProperties
 
 DEFAULT_PUBLISHED_PORT = 443
+
+
+class _StreamQueue:
+    def __init__(self) -> None:
+        self._streams: deque[RstreamStream] = deque()
+        self._waiters: deque[asyncio.Future[RstreamStream]] = deque()
+        self._close_error: BaseException | None = None
+
+    async def get(self) -> RstreamStream:
+        if self._streams:
+            return self._streams.popleft()
+        if self._close_error is not None:
+            raise self._close_error
+        future: asyncio.Future[RstreamStream] = (
+            asyncio.get_running_loop().create_future()
+        )
+        self._waiters.append(future)
+        try:
+            return await future
+        finally:
+            with suppress(ValueError):
+                self._waiters.remove(future)
+
+    def put(self, stream: RstreamStream) -> bool:
+        if self._close_error is not None:
+            stream.close()
+            return False
+        while self._waiters:
+            waiter = self._waiters.popleft()
+            if waiter.done():
+                continue
+            waiter.set_result(stream)
+            return True
+        self._streams.append(stream)
+        return True
+
+    def close(self, error: BaseException) -> None:
+        if self._close_error is not None:
+            return
+        self._close_error = error
+        while self._streams:
+            self._streams.popleft().close()
+        while self._waiters:
+            waiter = self._waiters.popleft()
+            if not waiter.done():
+                waiter.set_exception(error)
 
 
 class _TunnelControl(Protocol):
@@ -32,9 +79,7 @@ class BytestreamTunnel:
             )
         self._control = control
         self._properties = properties
-        self._queue: asyncio.Queue[RstreamStream | BaseException | None] = (
-            asyncio.Queue()
-        )
+        self._queue = _StreamQueue()
         self._closed = False
         self._forward_tasks: set[asyncio.Task[None]] = set()
 
@@ -55,15 +100,7 @@ class BytestreamTunnel:
         return self._properties
 
     async def accept(self) -> RstreamStream:
-        item = await self._queue.get()
-        if item is None:
-            raise RuntimeError(
-                "Tunnel closed.",
-                code="ERR_RSTREAM_TUNNEL_CLOSED",
-            )
-        if isinstance(item, BaseException):
-            raise item
-        return item
+        return await self._queue.get()
 
     async def close(self) -> None:
         if self._closed:
@@ -96,16 +133,19 @@ class BytestreamTunnel:
         if self._closed:
             stream.close()
             return False
-        self._queue.put_nowait(stream)
-        return True
+        return self._queue.put(stream)
 
     def on_close(self, error: BaseException | None = None) -> None:
         if self._closed:
             return
         self._closed = True
-        if error is not None:
-            self._queue.put_nowait(error)
-        self._queue.put_nowait(None)
+        self._queue.close(
+            error
+            or RuntimeError(
+                "Tunnel closed.",
+                code="ERR_RSTREAM_TUNNEL_CLOSED",
+            )
+        )
         for task in self._forward_tasks:
             task.cancel()
 

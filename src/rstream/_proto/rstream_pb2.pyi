@@ -159,20 +159,24 @@ class TunnelProperties(_message.Message):
     def __init__(self, id: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., creation_date: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., name: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., type: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., publish: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., protocol: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., labels: _Optional[_Mapping[str, str]] = ..., geoip: _Optional[_Iterable[str]] = ..., trusted_ips: _Optional[_Iterable[str]] = ..., host: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_mode: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_alpns: _Optional[_Iterable[str]] = ..., tls_min_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_ciphers: _Optional[_Iterable[str]] = ..., mtls_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., mtls_cacert_pem: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_use_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., token_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., rstream_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., challenge_mode: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., hostname: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., port: _Optional[_Union[_wrappers_pb2.UInt32Value, _Mapping]] = ..., upstream_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., datagram_guaranteed_delivery: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., allow_cross_region_routing: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ...) -> None: ...
 
 class OpenControlChannelReq(_message.Message):
-    __slots__ = ("client_details",)
+    __slots__ = ("client_details", "liveness")
     CLIENT_DETAILS_FIELD_NUMBER: _ClassVar[int]
+    LIVENESS_FIELD_NUMBER: _ClassVar[int]
     client_details: ClientDetails
-    def __init__(self, client_details: _Optional[_Union[ClientDetails, _Mapping]] = ...) -> None: ...
+    liveness: ControlChannelLiveness
+    def __init__(self, client_details: _Optional[_Union[ClientDetails, _Mapping]] = ..., liveness: _Optional[_Union[ControlChannelLiveness, _Mapping]] = ...) -> None: ...
 
 class OpenControlChannelRsp(_message.Message):
     __slots__ = ("ok", "error")
     class Ok(_message.Message):
-        __slots__ = ("client_id", "server_details")
+        __slots__ = ("client_id", "server_details", "liveness")
         CLIENT_ID_FIELD_NUMBER: _ClassVar[int]
         SERVER_DETAILS_FIELD_NUMBER: _ClassVar[int]
+        LIVENESS_FIELD_NUMBER: _ClassVar[int]
         client_id: str
         server_details: ServerDetails
-        def __init__(self, client_id: _Optional[str] = ..., server_details: _Optional[_Union[ServerDetails, _Mapping]] = ...) -> None: ...
+        liveness: ControlChannelLiveness
+        def __init__(self, client_id: _Optional[str] = ..., server_details: _Optional[_Union[ServerDetails, _Mapping]] = ..., liveness: _Optional[_Union[ControlChannelLiveness, _Mapping]] = ...) -> None: ...
     OK_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
     ok: OpenControlChannelRsp.Ok
@@ -283,9 +287,21 @@ class DatagramChannelClose(_message.Message):
     error: Error
     def __init__(self, stream_id: _Optional[str] = ..., error: _Optional[_Union[Error, _Mapping]] = ...) -> None: ...
 
+class ControlChannelLiveness(_message.Message):
+    __slots__ = ("heartbeat_interval_ms", "heartbeat_timeout_ms")
+    HEARTBEAT_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
+    HEARTBEAT_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    heartbeat_interval_ms: int
+    heartbeat_timeout_ms: int
+    def __init__(self, heartbeat_interval_ms: _Optional[int] = ..., heartbeat_timeout_ms: _Optional[int] = ...) -> None: ...
+
 class Heartbeat(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("sequence", "acknowledgement")
+    SEQUENCE_FIELD_NUMBER: _ClassVar[int]
+    ACKNOWLEDGEMENT_FIELD_NUMBER: _ClassVar[int]
+    sequence: int
+    acknowledgement: int
+    def __init__(self, sequence: _Optional[int] = ..., acknowledgement: _Optional[int] = ...) -> None: ...
 
 class ServerMessage(_message.Message):
     __slots__ = ("message",)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import ssl
+from contextlib import suppress
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,165 @@ async def test_connect_create_and_close_tunnel(tmp_path: Path) -> None:
 
         assert engine.open_tunnel_requests == 1
         assert engine.close_tunnel_requests == 1
+
+
+@pytest.mark.asyncio
+async def test_negotiated_liveness_tolerates_delayed_acknowledgement(
+    tmp_path: Path,
+) -> None:
+    async with await FakeEngine.start(
+        tmp_path,
+        liveness=(1_000, 1_000),
+        acknowledge_heartbeats=True,
+        heartbeat_acknowledgement_delay=0.8,
+    ) as engine:
+        control = await client_for(engine, heartbeat_interval=1.0).connect()
+
+        await asyncio.wait_for(engine.first_heartbeat.wait(), timeout=0.5)
+        assert engine.open_control_request is not None
+        assert engine.open_control_request.liveness.heartbeat_interval_ms == 1_000
+        assert engine.heartbeats[0].sequence == 1
+        await asyncio.sleep(1.1)
+        assert not control.closed
+
+        await control.close()
+
+
+@pytest.mark.asyncio
+async def test_negotiated_liveness_tolerates_a_dropped_heartbeat(
+    tmp_path: Path,
+) -> None:
+    async with await FakeEngine.start(
+        tmp_path,
+        liveness=(1_000, 2_500),
+        acknowledge_heartbeats=True,
+        heartbeat_acknowledgement_every=2,
+    ) as engine:
+        control = await client_for(engine, heartbeat_interval=1.0).connect()
+
+        await asyncio.sleep(3.2)
+        assert not control.closed
+        assert len(engine.heartbeats) >= 4
+
+        await control.close()
+
+
+@pytest.mark.asyncio
+async def test_liveness_is_not_starved_by_a_stalled_proxy_tls_handshake(
+    tmp_path: Path,
+) -> None:
+    accepted = asyncio.Event()
+    release = asyncio.Event()
+    blackhole_writers: set[asyncio.StreamWriter] = set()
+
+    async def blackhole(
+        _reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
+        blackhole_writers.add(writer)
+        accepted.set()
+        await release.wait()
+        writer.close()
+        await writer.wait_closed()
+
+    blackhole_server = await asyncio.start_server(blackhole, "127.0.0.1", 0)
+    socket = blackhole_server.sockets[0]
+    host, port = socket.getsockname()[:2]
+    try:
+        async with await FakeEngine.start(
+            tmp_path,
+            liveness=(1_000, 1_500),
+            acknowledge_heartbeats=True,
+        ) as engine:
+            control = await client_for(engine, heartbeat_interval=1.0).connect()
+            tunnel = await control.create_tunnel()
+            proxy_response = asyncio.create_task(
+                engine.request_proxy_connection(
+                    tunnel.id,
+                    "blocked-stream",
+                    proxy_endpoint=f"{host}:{port}",
+                )
+            )
+
+            await asyncio.wait_for(accepted.wait(), timeout=0.5)
+            await asyncio.sleep(1.9)
+            assert not control.closed
+
+            await control.close()
+            proxy_response.cancel()
+            await asyncio.gather(proxy_response, return_exceptions=True)
+    finally:
+        release.set()
+        for writer in blackhole_writers:
+            writer.close()
+        await asyncio.gather(
+            *(writer.wait_closed() for writer in blackhole_writers),
+            return_exceptions=True,
+        )
+        blackhole_server.close()
+        await blackhole_server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_negotiated_liveness_expires_when_acknowledgements_stop(
+    tmp_path: Path,
+) -> None:
+    async with await FakeEngine.start(
+        tmp_path,
+        liveness=(1_000, 1_000),
+    ) as engine:
+        control = await client_for(engine, heartbeat_interval=1.0).connect()
+
+        with pytest.raises(rstream.RstreamRuntimeError) as exc:
+            await asyncio.wait_for(control.done(), timeout=1.5)
+
+        assert exc.value.code == "ERR_RSTREAM_CONTROL_LIVENESS"
+
+
+@pytest.mark.asyncio
+async def test_negotiated_liveness_rejects_future_acknowledgement(
+    tmp_path: Path,
+) -> None:
+    async with await FakeEngine.start(
+        tmp_path,
+        liveness=(1_000, 60_000),
+        acknowledge_heartbeats=True,
+        heartbeat_acknowledgement_offset=1,
+    ) as engine:
+        control = await client_for(engine, heartbeat_interval=1.0).connect()
+
+        with pytest.raises(rstream.ProtocolError):
+            await asyncio.wait_for(control.done(), timeout=0.5)
+
+
+@pytest.mark.asyncio
+async def test_negotiated_liveness_rejects_replayed_acknowledgement(
+    tmp_path: Path,
+) -> None:
+    async with await FakeEngine.start(
+        tmp_path,
+        liveness=(1_000, 60_000),
+        acknowledge_heartbeats=True,
+        duplicate_heartbeat_acknowledgement=True,
+    ) as engine:
+        control = await client_for(engine, heartbeat_interval=1.0).connect()
+
+        with pytest.raises(rstream.ProtocolError):
+            await asyncio.wait_for(control.done(), timeout=0.5)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "liveness",
+    [(2_000, 60_000), (1_000, 999), (1_000, 900_001)],
+)
+async def test_connect_rejects_invalid_server_liveness_policy(
+    tmp_path: Path,
+    liveness: tuple[int, int],
+) -> None:
+    async with await FakeEngine.start(tmp_path, liveness=liveness) as engine:
+        with pytest.raises(rstream.ProtocolError):
+            await client_for(engine, heartbeat_interval=1.0).connect()
 
 
 @pytest.mark.asyncio
@@ -223,6 +383,69 @@ async def test_proxy_connection_delivery_round_trip(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_control_close_closes_an_unaccepted_proxy_stream(tmp_path: Path) -> None:
+    async with await FakeEngine.start(tmp_path) as engine:
+        control = await client_for(engine).connect()
+        tunnel = await control.create_tunnel()
+        response_waiter = asyncio.create_task(
+            engine.request_proxy_connection(tunnel.id, "unaccepted-stream")
+        )
+        engine_stream = await engine.next_proxy_stream()
+        response = await response_waiter
+        assert not response.proxy_conn_rsp.HasField("error")
+
+        await control.close()
+
+        assert await asyncio.wait_for(engine_stream.read(), timeout=0.5) == b""
+        engine_stream.close()
+        await engine_stream.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_proxy_stream_is_closed_when_tunnel_closes_during_dial(
+    tmp_path: Path,
+) -> None:
+    async with await FakeEngine.start(tmp_path) as engine:
+        engine.proxy_handshake_gate = asyncio.Event()
+        async with await client_for(engine).connect() as control:
+            tunnel = await control.create_tunnel()
+            response_waiter = asyncio.create_task(
+                engine.request_proxy_connection(tunnel.id, "closing-stream")
+            )
+            await asyncio.wait_for(engine.first_proxy_request.wait(), timeout=1)
+            await tunnel.close()
+            engine.proxy_handshake_gate.set()
+            engine_stream = await engine.next_proxy_stream()
+            response = await response_waiter
+
+            assert response.proxy_conn_rsp.HasField("error")
+            assert await asyncio.wait_for(engine_stream.read(), timeout=0.5) == b""
+            engine_stream.close()
+            await engine_stream.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_control_close_releases_all_concurrent_accept_waiters(
+    tmp_path: Path,
+) -> None:
+    async with await FakeEngine.start(tmp_path) as engine:
+        control = await client_for(engine).connect()
+        tunnel = await control.create_tunnel()
+        accept_tasks = [asyncio.create_task(tunnel.accept()) for _ in range(8)]
+        await asyncio.sleep(0)
+
+        await control.close()
+
+        results = await asyncio.wait_for(
+            asyncio.gather(*accept_tasks, return_exceptions=True),
+            timeout=0.5,
+        )
+        assert all(
+            isinstance(result, rstream.RstreamRuntimeError) for result in results
+        )
+
+
+@pytest.mark.asyncio
 async def test_proxy_connection_can_dial_ingress_engine(tmp_path: Path) -> None:
     ca = trustme.CA()
     async with (
@@ -353,12 +576,14 @@ async def test_client_close_closes_open_control_channels(tmp_path: Path) -> None
 def client_for(
     engine: FakeEngine,
     *,
+    heartbeat_interval: float = 5.0,
     operation_timeout: float = 1,
     token: str | None = None,
     zero_rtt: bool = False,
 ) -> rstream.Client:
     return rstream.Client(
         engine=engine.address,
+        heartbeat_interval=heartbeat_interval,
         no_token=token is None,
         operation_timeout=operation_timeout,
         read_config_file=False,
@@ -393,6 +618,8 @@ class FakeEngine:
         self.stream_requests: list[tuple[str, bool]] = []
         self.proxy_requests: list[tuple[str, bool]] = []
         self.proxy_tokens: list[str | None] = []
+        self.proxy_handshake_gate: asyncio.Event | None = None
+        self.first_proxy_request = asyncio.Event()
         self._control_writer: asyncio.StreamWriter | None = None
         self._pending_proxy_responses: asyncio.Queue[pb.Message] = asyncio.Queue()
         self._proxy_streams: asyncio.Queue[rstream.RstreamStream] = asyncio.Queue()
@@ -400,6 +627,15 @@ class FakeEngine:
         self._writers: set[asyncio.StreamWriter] = set()
         self._hold_tasks: set[asyncio.Task[None]] = set()
         self._closed_event = asyncio.Event()
+        self.liveness: tuple[int, int] | None = None
+        self.acknowledge_heartbeats = False
+        self.heartbeat_acknowledgement_delay = 0.0
+        self.heartbeat_acknowledgement_offset = 0
+        self.heartbeat_acknowledgement_every = 1
+        self.duplicate_heartbeat_acknowledgement = False
+        self.open_control_request: pb.OpenControlChannelReq | None = None
+        self.heartbeats: list[pb.Heartbeat] = []
+        self.first_heartbeat = asyncio.Event()
 
     @classmethod
     async def start(
@@ -408,6 +644,12 @@ class FakeEngine:
         *,
         name: str = "engine",
         ca: trustme.CA | None = None,
+        liveness: tuple[int, int] | None = None,
+        acknowledge_heartbeats: bool = False,
+        heartbeat_acknowledgement_delay: float = 0.0,
+        heartbeat_acknowledgement_offset: int = 0,
+        heartbeat_acknowledgement_every: int = 1,
+        duplicate_heartbeat_acknowledgement: bool = False,
     ) -> FakeEngine:
         certificate_authority = ca or trustme.CA()
         cert = certificate_authority.issue_cert("localhost", "127.0.0.1")
@@ -430,6 +672,12 @@ class FakeEngine:
         socket = server.sockets[0]
         host, port = socket.getsockname()[:2]
         cls.__init__(engine, server, f"{host}:{port}", ca_file)
+        engine.liveness = liveness
+        engine.acknowledge_heartbeats = acknowledge_heartbeats
+        engine.heartbeat_acknowledgement_delay = heartbeat_acknowledgement_delay
+        engine.heartbeat_acknowledgement_offset = heartbeat_acknowledgement_offset
+        engine.heartbeat_acknowledgement_every = heartbeat_acknowledgement_every
+        engine.duplicate_heartbeat_acknowledgement = duplicate_heartbeat_acknowledgement
         return engine
 
     async def __aenter__(self) -> FakeEngine:
@@ -487,7 +735,8 @@ class FakeEngine:
         writer = self._control_writer
         assert writer is not None
         writer.close()
-        await writer.wait_closed()
+        with suppress(ssl.SSLError, ConnectionError):
+            await writer.wait_closed()
 
     async def _handle_connection(
         self,
@@ -499,6 +748,7 @@ class FakeEngine:
             message = await read_message(reader)
             payload = message.WhichOneof("payload")
             if payload == "open_control_channel_req":
+                self.open_control_request = message.open_control_channel_req
                 await self._handle_control_channel(reader, writer)
                 return
             if payload == "stream_req":
@@ -510,7 +760,8 @@ class FakeEngine:
         finally:
             self._writers.discard(writer)
             writer.close()
-            await writer.wait_closed()
+            with suppress(ssl.SSLError, ConnectionError):
+                await writer.wait_closed()
 
     async def _handle_control_channel(
         self,
@@ -525,6 +776,14 @@ class FakeEngine:
         response.open_control_channel_rsp.ok.server_details.agent.CopyFrom(
             StringValue(value="fake-engine")
         )
+        if self.liveness is not None:
+            interval_ms, timeout_ms = self.liveness
+            response.open_control_channel_rsp.ok.liveness.heartbeat_interval_ms = (
+                interval_ms
+            )
+            response.open_control_channel_rsp.ok.liveness.heartbeat_timeout_ms = (
+                timeout_ms
+            )
         await write_message(writer, response)
         while True:
             message = await read_message(reader)
@@ -542,6 +801,22 @@ class FakeEngine:
                 await self._pending_proxy_responses.put(message)
                 continue
             if payload == "heartbeat":
+                heartbeat = pb.Heartbeat()
+                heartbeat.CopyFrom(message.heartbeat)
+                self.heartbeats.append(heartbeat)
+                self.first_heartbeat.set()
+                if self.acknowledge_heartbeats:
+                    if len(self.heartbeats) % self.heartbeat_acknowledgement_every != 0:
+                        continue
+                    if len(self.heartbeats) == 1:
+                        await asyncio.sleep(self.heartbeat_acknowledgement_delay)
+                    response = pb.Message()
+                    response.heartbeat.acknowledgement = (
+                        heartbeat.sequence + self.heartbeat_acknowledgement_offset
+                    )
+                    await write_message(writer, response)
+                    if self.duplicate_heartbeat_acknowledgement:
+                        await write_message(writer, response)
                 continue
 
     async def _handle_open_tunnel(
@@ -634,6 +909,7 @@ class FakeEngine:
     ) -> None:
         zero_rtt = request.HasField("zero_rtt") and request.zero_rtt.value
         self.proxy_requests.append((request.stream_id, zero_rtt))
+        self.first_proxy_request.set()
         self.proxy_tokens.append(
             request.client_details.token.value
             if request.client_details.HasField("token")
@@ -641,6 +917,8 @@ class FakeEngine:
         )
         if self._consume("next_proxy_hang"):
             await self._hold()
+        if self.proxy_handshake_gate is not None:
+            await self.proxy_handshake_gate.wait()
         if not zero_rtt:
             response = pb.Message()
             response.proxy_rsp.CopyFrom(pb.ProxyRsp())

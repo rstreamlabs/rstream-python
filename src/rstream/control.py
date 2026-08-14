@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections import deque
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import suppress
 from typing import TypeVar
@@ -37,6 +38,8 @@ from rstream.types import (
 
 OpenProxyConnection = Callable[[pb.ProxyConnReq], Awaitable[RstreamStream]]
 _T = TypeVar("_T")
+_MAX_ACTIVE_PROXY_CONNECTIONS = 256
+_MAX_QUEUED_PROXY_CONNECTIONS = 1_024
 
 
 class ControlChannel:
@@ -49,6 +52,7 @@ class ControlChannel:
         *,
         heartbeat: bool,
         heartbeat_interval: float,
+        heartbeat_timeout: float,
         operation_timeout: float,
         open_proxy_connection: OpenProxyConnection,
         server_details: ServerDetails | None = None,
@@ -57,6 +61,7 @@ class ControlChannel:
         self._writer = writer
         self._heartbeat = heartbeat
         self._heartbeat_interval = heartbeat_interval
+        self._heartbeat_timeout = heartbeat_timeout
         self._operation_timeout = operation_timeout
         self._open_proxy_connection = open_proxy_connection
         self._server_details = server_details
@@ -64,6 +69,11 @@ class ControlChannel:
         self._pending_closes: dict[str, asyncio.Future[None]] = {}
         self._tunnels: dict[str, BytestreamTunnel] = {}
         self._write_lock = asyncio.Lock()
+        self._proxy_queue: deque[pb.ProxyConnReq] = deque()
+        self._proxy_tasks: set[asyncio.Task[None]] = set()
+        self._heartbeat_sequence = 0
+        self._heartbeat_acknowledgement = 0
+        self._liveness_handle: asyncio.TimerHandle | None = None
         self._closed = False
         self._closing = False
         self._close_error: BaseException | None = None
@@ -73,6 +83,8 @@ class ControlChannel:
         self._heartbeat_task: asyncio.Task[None] | None = None
         if heartbeat and heartbeat_interval > 0:
             self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+        if heartbeat_timeout > 0:
+            self._arm_liveness_timer()
 
     @property
     def closed(self) -> bool:
@@ -231,9 +243,15 @@ class ControlChannel:
     async def _heartbeat_loop(self) -> None:
         try:
             while not self._closed:
+                self._heartbeat_sequence += 1
+                await self._write(
+                    message_with_heartbeat(
+                        self._heartbeat_sequence
+                        if self._heartbeat_timeout > 0
+                        else None
+                    )
+                )
                 await asyncio.sleep(self._heartbeat_interval)
-                if not self._closed:
-                    await self._write(message_with_heartbeat())
         except BaseException as error:
             if not self._closed:
                 self._fail(error)
@@ -242,6 +260,8 @@ class ControlChannel:
         try:
             while not self._closed:
                 await self._handle_message(await read_message(self._reader))
+                if not self._closed and self._heartbeat_timeout > 0:
+                    self._arm_liveness_timer()
         except BaseException as error:
             if not self._closed:
                 self._fail(error)
@@ -255,7 +275,10 @@ class ControlChannel:
             self._handle_close_tunnel_rsp(message.close_tunnel_rsp.tunnel_id)
             return
         if payload == "proxy_conn_req":
-            await self._handle_proxy_conn_req(message.proxy_conn_req)
+            self._dispatch_proxy_conn_req(message.proxy_conn_req)
+            return
+        if payload == "heartbeat":
+            self._handle_heartbeat(message.heartbeat)
             return
         if payload == "close_control_channel_rsp":
             self._finish()
@@ -290,6 +313,51 @@ class ControlChannel:
         if pending is not None and not pending.done():
             pending.set_result(None)
 
+    def _handle_heartbeat(self, heartbeat: pb.Heartbeat) -> None:
+        if not self._heartbeat:
+            raise self._heartbeat_protocol_error()
+        if self._heartbeat_timeout == 0:
+            if heartbeat.sequence != 0 or heartbeat.acknowledgement != 0:
+                raise self._heartbeat_protocol_error()
+            return
+        if (
+            heartbeat.sequence != 0
+            or heartbeat.acknowledgement == 0
+            or heartbeat.acknowledgement <= self._heartbeat_acknowledgement
+            or heartbeat.acknowledgement > self._heartbeat_sequence
+        ):
+            raise self._heartbeat_protocol_error()
+        self._heartbeat_acknowledgement = heartbeat.acknowledgement
+
+    def _dispatch_proxy_conn_req(self, request: pb.ProxyConnReq) -> None:
+        if len(self._proxy_tasks) >= _MAX_ACTIVE_PROXY_CONNECTIONS:
+            if len(self._proxy_queue) >= _MAX_QUEUED_PROXY_CONNECTIONS:
+                self._fail(
+                    RuntimeError(
+                        "Control channel proxy queue is full.",
+                        code="ERR_RSTREAM_CONTROL_OVERLOAD",
+                    )
+                )
+                return
+            queued = pb.ProxyConnReq()
+            queued.CopyFrom(request)
+            self._proxy_queue.append(queued)
+            return
+        task = asyncio.create_task(self._handle_proxy_conn_req(request))
+        self._proxy_tasks.add(task)
+        task.add_done_callback(self._proxy_task_done)
+
+    def _proxy_task_done(self, task: asyncio.Task[None]) -> None:
+        self._proxy_tasks.discard(task)
+        if not task.cancelled():
+            try:
+                task.result()
+            except BaseException as error:
+                if not self._closed:
+                    self._fail(error)
+        if not self._closed and self._proxy_queue:
+            self._dispatch_proxy_conn_req(self._proxy_queue.popleft())
+
     async def _handle_proxy_conn_req(self, request: pb.ProxyConnReq) -> None:
         tunnel = self._tunnels.get(request.tunnel_id)
         if tunnel is None:
@@ -302,7 +370,13 @@ class ControlChannel:
             return
         try:
             stream = await self._open_proxy_connection(request)
+            if self._closed:
+                stream.close()
+                await stream.wait_closed()
+                return
             if not tunnel.deliver(stream):
+                stream.close()
+                await stream.wait_closed()
                 await self._write(
                     message_with_proxy_conn_rsp(
                         request.stream_id,
@@ -311,14 +385,48 @@ class ControlChannel:
                 )
                 return
             await self._write(message_with_proxy_conn_rsp(request.stream_id))
-        except BaseException as error:
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            if self._closed:
+                return
             await self._write(
                 message_with_proxy_conn_rsp(request.stream_id, error_to_pb(str(error)))
             )
 
     async def _write(self, message: pb.Message) -> None:
+        if self._closed:
+            raise RuntimeError(
+                "Control channel is closed.",
+                code="ERR_RSTREAM_CONTROL_CLOSED",
+            )
         async with self._write_lock:
             await write_message(self._writer, message)
+
+    def _arm_liveness_timer(self) -> None:
+        if self._closed:
+            return
+        if self._liveness_handle is not None:
+            self._liveness_handle.cancel()
+        self._liveness_handle = asyncio.get_running_loop().call_later(
+            self._heartbeat_timeout,
+            self._liveness_expired,
+        )
+
+    def _liveness_expired(self) -> None:
+        self._fail(
+            RuntimeError(
+                "Control channel liveness timeout expired.",
+                code="ERR_RSTREAM_CONTROL_LIVENESS",
+            )
+        )
+
+    @staticmethod
+    def _heartbeat_protocol_error() -> ProtocolError:
+        return ProtocolError(
+            "Engine returned an invalid heartbeat.",
+            code="ERR_RSTREAM_PROTOCOL",
+        )
 
     async def _await_pending(
         self,
@@ -342,8 +450,15 @@ class ControlChannel:
         if self._closed:
             return
         self._closed = True
+        if self._liveness_handle is not None:
+            self._liveness_handle.cancel()
         if self._heartbeat_task is not None:
             self._heartbeat_task.cancel()
+        current_task = asyncio.current_task()
+        for proxy_task in self._proxy_tasks:
+            if proxy_task is not current_task:
+                proxy_task.cancel()
+        self._proxy_queue.clear()
         if self._read_task is not asyncio.current_task():
             self._read_task.cancel()
         self._writer.close()
