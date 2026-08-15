@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/rstreamlabs/rstream-python/compare/v0.5.0...v0.6.0) (2026-08-15)
+
+
+### Features
+
+* **runtime:** negotiate bounded control liveness ([8f41108](https://github.com/rstreamlabs/rstream-python/commit/8f41108c7f57d837e605c5156a8046bc6fc25603))
+* **runtime:** negotiate bounded control liveness ([0e39636](https://github.com/rstreamlabs/rstream-python/commit/0e396369421a8f023f3fc42a78a68c9240309201))
+
+
+### Bug Fixes
+
+* **runtime:** parallelize bounded proxy handshakes ([397f0cd](https://github.com/rstreamlabs/rstream-python/commit/397f0cdd0fda7329bf709f331ee0408551118e02))
+* **runtime:** preserve payloads across control loss ([37cfd47](https://github.com/rstreamlabs/rstream-python/commit/37cfd474dc1d4fc1ebfca58e9260b1506bd92f27))
+
 ## [0.5.0](https://github.com/rstreamlabs/rstream-python/compare/v0.4.0...v0.5.0) (2026-08-01)
 
 
