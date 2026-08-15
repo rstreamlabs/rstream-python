@@ -38,8 +38,11 @@ from rstream.types import (
 
 OpenProxyConnection = Callable[[pb.ProxyConnReq], Awaitable[RstreamStream]]
 _T = TypeVar("_T")
-_MAX_ACTIVE_PROXY_CONNECTIONS = 256
-_MAX_QUEUED_PROXY_CONNECTIONS = 1_024
+# Each active request owns a socket and a TLS handshake. Keep the worker budget
+# aligned with the Go SDK and queue excess bursts instead of multiplying memory,
+# file descriptors, and handshakes without a bound.
+_MAX_ACTIVE_PROXY_CONNECTIONS = 64
+_MAX_QUEUED_PROXY_CONNECTIONS = 256
 
 
 class ControlChannel:

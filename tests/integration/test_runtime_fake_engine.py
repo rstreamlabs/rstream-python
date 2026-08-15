@@ -407,6 +407,60 @@ async def test_proxy_connection_delivery_round_trip(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_proxy_handshakes_progress_concurrently_without_blocking_control(
+    tmp_path: Path,
+) -> None:
+    stream_ids = [f"stream_concurrent_{index}" for index in range(16)]
+    async with await FakeEngine.start(tmp_path) as engine:
+        engine.proxy_handshake_gate = asyncio.Event()
+        client = client_for(engine, zero_rtt=False)
+
+        async with await client.connect() as control:
+            tunnel = await control.create_tunnel()
+            response_tasks = [
+                asyncio.create_task(
+                    engine.request_proxy_connection(
+                        tunnel.id,
+                        stream_id,
+                        timeout=3,
+                    )
+                )
+                for stream_id in stream_ids
+            ]
+            observed = await asyncio.wait_for(
+                asyncio.gather(
+                    *(engine.observed_proxy_requests.get() for _ in stream_ids)
+                ),
+                timeout=2,
+            )
+
+            assert {stream_id for stream_id, _ in observed} == set(stream_ids)
+            assert all(not zero_rtt for _, zero_rtt in observed)
+
+            engine.proxy_handshake_gate.set()
+            streams = await asyncio.gather(
+                *(engine.next_proxy_stream() for _ in stream_ids)
+            )
+            responses = await asyncio.wait_for(
+                asyncio.gather(*response_tasks),
+                timeout=2,
+            )
+
+            assert {response.proxy_conn_rsp.stream_id for response in responses} == set(
+                stream_ids
+            )
+            assert all(
+                not response.proxy_conn_rsp.HasField("error") for response in responses
+            )
+            for stream in streams:
+                stream.close()
+            await asyncio.gather(
+                *(stream.wait_closed() for stream in streams),
+                return_exceptions=True,
+            )
+
+
+@pytest.mark.asyncio
 async def test_forwarded_stream_survives_liveness_timeout(tmp_path: Path) -> None:
     server, host, port = await start_uppercase_server()
     async with (
@@ -786,6 +840,7 @@ class FakeEngine:
         self.open_tunnel_requests = 0
         self.stream_requests: list[tuple[str, bool]] = []
         self.proxy_requests: list[tuple[str, bool]] = []
+        self.observed_proxy_requests: asyncio.Queue[tuple[str, bool]] = asyncio.Queue()
         self.proxy_tokens: list[str | None] = []
         self.proxy_handshake_gate: asyncio.Event | None = None
         self.first_proxy_request = asyncio.Event()
@@ -883,6 +938,7 @@ class FakeEngine:
         proxy_endpoint: str | None = None,
         include_secret: bool = True,
         secret: str = "stream-secret",
+        timeout: float = 1,
     ) -> pb.Message:
         writer = self._control_writer
         assert writer is not None
@@ -896,7 +952,10 @@ class FakeEngine:
         if include_secret:
             message.proxy_conn_req.secret.CopyFrom(StringValue(value=secret))
         await write_message(writer, message)
-        return await asyncio.wait_for(self._pending_proxy_responses.get(), timeout=1)
+        return await asyncio.wait_for(
+            self._pending_proxy_responses.get(),
+            timeout=timeout,
+        )
 
     async def next_proxy_stream(self) -> rstream.RstreamStream:
         return await asyncio.wait_for(self._proxy_streams.get(), timeout=1)
@@ -1087,6 +1146,7 @@ class FakeEngine:
     ) -> None:
         zero_rtt = request.HasField("zero_rtt") and request.zero_rtt.value
         self.proxy_requests.append((request.stream_id, zero_rtt))
+        await self.observed_proxy_requests.put((request.stream_id, zero_rtt))
         self.first_proxy_request.set()
         self.proxy_tokens.append(
             request.client_details.token.value
