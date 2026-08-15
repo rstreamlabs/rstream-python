@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/rstreamlabs/rstream-python/compare/v0.6.0...v0.6.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* **release:** validate Python package metadata ([3334245](https://github.com/rstreamlabs/rstream-python/commit/3334245a09f2826ccd970df432f3a03d2af3d577))
+* **release:** validate Python package metadata ([b4cdea5](https://github.com/rstreamlabs/rstream-python/commit/b4cdea5d8acc147545daf3a977d1991f80069060))
+
 ## [0.6.0](https://github.com/rstreamlabs/rstream-python/compare/v0.5.0...v0.6.0) (2026-08-15)
 
 
