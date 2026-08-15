@@ -44,6 +44,28 @@ from rstream.stable_domains import generate_stable_domain
 from rstream.stream import RstreamStream
 
 _T = TypeVar("_T")
+_MAX_HEARTBEAT_TIMEOUT_MS = 900_000
+
+
+def _negotiated_heartbeat_timeout(
+    heartbeat: bool,
+    heartbeat_interval_ms: int,
+    response: pb.OpenControlChannelRsp.Ok,
+) -> float:
+    if not response.HasField("liveness"):
+        return 0.0
+    liveness = response.liveness
+    if (
+        not heartbeat
+        or liveness.heartbeat_interval_ms != heartbeat_interval_ms
+        or liveness.heartbeat_timeout_ms < liveness.heartbeat_interval_ms
+        or liveness.heartbeat_timeout_ms > _MAX_HEARTBEAT_TIMEOUT_MS
+    ):
+        raise ProtocolError(
+            "Engine returned an invalid liveness policy.",
+            code="ERR_RSTREAM_PROTOCOL",
+        )
+    return liveness.heartbeat_timeout_ms / 1_000
 
 
 class Client:
@@ -146,8 +168,17 @@ class Client:
         engine = await self._resolve_engine(resolved)
         token = await self._resolve_token(resolved, engine)
         reader, writer = await self._dial_engine(engine, resolved)
+        heartbeat_interval_ms = (
+            round(resolved.heartbeat_interval * 1_000) if resolved.heartbeat else 0
+        )
         try:
-            await write_message(writer, message_with_open_control_channel_req(token))
+            await write_message(
+                writer,
+                message_with_open_control_channel_req(
+                    token,
+                    heartbeat_interval_ms if resolved.heartbeat else None,
+                ),
+            )
             response = await _wait_for_operation(
                 read_message(reader),
                 resolved.operation_timeout,
@@ -172,6 +203,11 @@ class Client:
                 writer,
                 heartbeat=resolved.heartbeat,
                 heartbeat_interval=resolved.heartbeat_interval,
+                heartbeat_timeout=_negotiated_heartbeat_timeout(
+                    resolved.heartbeat,
+                    heartbeat_interval_ms,
+                    payload.ok,
+                ),
                 operation_timeout=resolved.operation_timeout,
                 open_proxy_connection=lambda request: self._open_proxy_connection(
                     engine,

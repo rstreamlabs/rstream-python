@@ -99,12 +99,47 @@ async def test_tunnel_close_waits_for_forwarders() -> None:
             stopped.set()
 
     task = asyncio.create_task(forwarder())
-    tunnel._forward_tasks.add(task)
-    task.add_done_callback(tunnel._forward_tasks.discard)
+    tunnel._forward_tasks[task] = _stream_double()
+    task.add_done_callback(tunnel._forward_task_done)
     await started.wait()
 
     await tunnel.close()
 
+    assert stopped.is_set()
+    assert task.done()
+
+
+@pytest.mark.asyncio
+async def test_hard_close_cancels_a_preserved_forwarder() -> None:
+    control = _Control()
+    tunnel = BytestreamTunnel(control, TunnelProperties(id="tun_123"))
+    started = asyncio.Event()
+    stopped = asyncio.Event()
+
+    async def forwarder() -> None:
+        started.set()
+        try:
+            await asyncio.Future()
+        finally:
+            stopped.set()
+
+    task = asyncio.create_task(forwarder())
+    tunnel._forward_tasks[task] = _stream_double()
+    task.add_done_callback(tunnel._forward_task_done)
+    await started.wait()
+    tunnel.on_close(
+        RstreamRuntimeError(
+            "Control channel liveness timeout expired.",
+            code="ERR_RSTREAM_CONTROL_LIVENESS",
+        ),
+        preserve_forwarders=True,
+    )
+    await asyncio.sleep(0)
+    assert not task.done()
+
+    await tunnel.close()
+
+    assert control.closed_tunnels == []
     assert stopped.is_set()
     assert task.done()
 
@@ -118,6 +153,42 @@ async def test_tunnel_accepts_delivered_stream() -> None:
 
     accepted = await tunnel.accept()
     assert accepted is stream
+
+
+@pytest.mark.asyncio
+async def test_hard_close_wins_delivery_acceptance_race() -> None:
+    stream = _stream_double()
+    tunnel = BytestreamTunnel(_Control(), TunnelProperties(id="tun_123"))
+    acceptance = asyncio.create_task(tunnel.accept())
+    await asyncio.sleep(0)
+
+    assert tunnel.deliver(stream) is True
+    tunnel.on_close()
+
+    with pytest.raises(RstreamRuntimeError) as failure:
+        await acceptance
+    assert failure.value.code == "ERR_RSTREAM_TUNNEL_CLOSED"
+    assert stream.writer.is_closing()
+
+
+@pytest.mark.asyncio
+async def test_soft_close_preserves_delivery_acceptance_race() -> None:
+    stream = _stream_double()
+    tunnel = BytestreamTunnel(_Control(), TunnelProperties(id="tun_123"))
+    acceptance = asyncio.create_task(tunnel.accept())
+    await asyncio.sleep(0)
+
+    assert tunnel.deliver(stream) is True
+    tunnel.on_close(
+        RstreamRuntimeError(
+            "Control channel liveness timeout expired.",
+            code="ERR_RSTREAM_CONTROL_LIVENESS",
+        ),
+        preserve_forwarders=True,
+    )
+
+    assert await acceptance is stream
+    assert not stream.writer.is_closing()
 
 
 @pytest.mark.asyncio

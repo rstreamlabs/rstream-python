@@ -44,6 +44,22 @@ def test_default_runtime_timeouts_are_resolved() -> None:
             ClientOptions(operation_timeout=-1, read_config_file=False),
             "operation_timeout",
         ),
+        (
+            ClientOptions(heartbeat_interval=0.999, read_config_file=False),
+            "heartbeat_interval",
+        ),
+        (
+            ClientOptions(heartbeat_interval=300.001, read_config_file=False),
+            "heartbeat_interval",
+        ),
+        (
+            ClientOptions(heartbeat_interval=1.0005, read_config_file=False),
+            "heartbeat_interval",
+        ),
+        (
+            ClientOptions(heartbeat_interval=float("inf"), read_config_file=False),
+            "heartbeat_interval",
+        ),
     ],
 )
 def test_resolve_client_options_rejects_invalid_timeouts(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import os
 import re
 import ssl
@@ -17,6 +18,8 @@ import yaml
 from rstream.errors import ConfigurationError, UnsupportedFeatureError
 
 DEFAULT_API_URL = "https://rstream.io"
+MIN_HEARTBEAT_INTERVAL_MS = 1_000
+MAX_HEARTBEAT_INTERVAL_MS = 300_000
 
 
 @dataclass(frozen=True)
@@ -228,6 +231,30 @@ async def resolve_client_options(options: ClientOptions) -> ResolvedClientOption
         raise ConfigurationError(
             "operation_timeout must be positive.",
             code="ERR_RSTREAM_INVALID_TIMEOUT",
+        )
+    if options.heartbeat and not math.isfinite(options.heartbeat_interval):
+        raise ConfigurationError(
+            "heartbeat_interval must be between 1 and 300 seconds with "
+            "millisecond precision.",
+            code="ERR_RSTREAM_INVALID_CONFIG",
+        )
+    heartbeat_interval_ms = (
+        round(options.heartbeat_interval * 1_000) if options.heartbeat else 0
+    )
+    if options.heartbeat and (
+        not math.isclose(
+            options.heartbeat_interval * 1_000,
+            heartbeat_interval_ms,
+            abs_tol=1e-9,
+        )
+        or not MIN_HEARTBEAT_INTERVAL_MS
+        <= heartbeat_interval_ms
+        <= MAX_HEARTBEAT_INTERVAL_MS
+    ):
+        raise ConfigurationError(
+            "heartbeat_interval must be between 1 and 300 seconds with "
+            "millisecond precision.",
+            code="ERR_RSTREAM_INVALID_CONFIG",
         )
     region = _normalize_region(
         _first_defined(options.region, env.region, config.region)

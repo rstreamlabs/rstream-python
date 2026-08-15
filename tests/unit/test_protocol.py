@@ -10,6 +10,8 @@ from rstream.protocol import (
     create_client_details,
     decode_message,
     encode_message,
+    message_with_heartbeat,
+    message_with_open_control_channel_req,
     protocol_version,
     read_message,
     tunnel_properties_from_pb,
@@ -87,6 +89,16 @@ def test_client_details_use_protocol_version_from_proto_descriptor() -> None:
     assert details.protocol_version.value == expected
     assert details.version.value == __version__
     assert __version__ != "unknown"
+
+
+def test_control_liveness_messages_preserve_sequence_and_interval() -> None:
+    request = message_with_open_control_channel_req(None, 1_250)
+    heartbeat = message_with_heartbeat(42)
+
+    assert request.open_control_channel_req.liveness.heartbeat_interval_ms == 1_250
+    assert request.open_control_channel_req.liveness.heartbeat_timeout_ms == 0
+    assert heartbeat.heartbeat.sequence == 42
+    assert heartbeat.heartbeat.acknowledgement == 0
 
 
 @pytest.mark.asyncio

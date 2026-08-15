@@ -243,11 +243,18 @@ def create_client_details(token: str | None) -> pb.ClientDetails:
     return details
 
 
-def message_with_open_control_channel_req(token: str | None) -> pb.Message:
+def message_with_open_control_channel_req(
+    token: str | None,
+    heartbeat_interval_ms: int | None = None,
+) -> pb.Message:
     message = pb.Message()
     message.open_control_channel_req.client_details.CopyFrom(
         create_client_details(token)
     )
+    if heartbeat_interval_ms is not None:
+        message.open_control_channel_req.liveness.heartbeat_interval_ms = (
+            heartbeat_interval_ms
+        )
     return message
 
 
@@ -310,9 +317,12 @@ def message_with_stream_req(
     return message
 
 
-def message_with_heartbeat() -> pb.Message:
+def message_with_heartbeat(sequence: int | None = None) -> pb.Message:
     message = pb.Message()
-    message.heartbeat.CopyFrom(pb.Heartbeat())
+    if sequence is None:
+        message.heartbeat.CopyFrom(pb.Heartbeat())
+    else:
+        message.heartbeat.sequence = sequence
     return message
 
 

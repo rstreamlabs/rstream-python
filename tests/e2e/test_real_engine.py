@@ -70,6 +70,22 @@ async def test_real_engine_private_bytestream_matrix() -> None:
             finally:
                 responder.cancel()
                 await asyncio.gather(responder, return_exceptions=True)
+
+            await asyncio.sleep(2.2)
+            responder = asyncio.create_task(
+                echo_one_stream(tunnel, b"heartbeat", b"HEARTBEAT")
+            )
+            try:
+                await assert_private_round_trip(
+                    client,
+                    tunnel_name,
+                    zero_rtt=False,
+                    request=b"heartbeat",
+                    response=b"HEARTBEAT",
+                )
+            finally:
+                responder.cancel()
+                await asyncio.gather(responder, return_exceptions=True)
         finally:
             await tunnel.close()
 
@@ -372,6 +388,7 @@ def real_engine_client(*, zero_rtt: bool) -> rstream.Client:
     )
     return rstream.Client(
         engine=engine,
+        heartbeat_interval=1.0,
         no_token=token is None,
         read_config_file=False,
         tls=tls,
