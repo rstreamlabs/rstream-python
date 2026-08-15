@@ -14,6 +14,27 @@ from rstream._proto import rstream_pb2 as pb
 from rstream.protocol import read_message, write_message
 
 
+async def start_uppercase_server() -> tuple[asyncio.AbstractServer, str, int]:
+    async def echo(
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
+        try:
+            while data := await reader.read(64 * 1024):
+                writer.write(data.upper())
+                await writer.drain()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    server = await asyncio.start_server(echo, "127.0.0.1", 0)
+    sockets = server.sockets
+    assert sockets
+    address = sockets[0].getsockname()
+    assert isinstance(address, tuple)
+    return server, str(address[0]), int(address[1])
+
+
 @pytest.mark.asyncio
 async def test_connect_create_and_close_tunnel(tmp_path: Path) -> None:
     async with await FakeEngine.start(tmp_path) as engine:
@@ -386,6 +407,151 @@ async def test_proxy_connection_delivery_round_trip(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_forwarded_stream_survives_liveness_timeout(tmp_path: Path) -> None:
+    server, host, port = await start_uppercase_server()
+    async with (
+        server,
+        await FakeEngine.start(tmp_path, liveness=(1_000, 1_000)) as engine,
+    ):
+        control = await client_for(engine, heartbeat_interval=1.0).connect()
+        tunnel = await control.create_tunnel()
+        forwarding = asyncio.create_task(tunnel.forward_to(host, port))
+        response_waiter = asyncio.create_task(
+            engine.request_proxy_connection(tunnel.id, "draining-forward")
+        )
+        engine_stream = await engine.next_proxy_stream()
+        response = await response_waiter
+        assert not response.proxy_conn_rsp.HasField("error")
+        engine_stream.write(b"before")
+        await engine_stream.drain()
+        assert await engine_stream.readexactly(6) == b"BEFORE"
+        with pytest.raises(rstream.RstreamRuntimeError) as failure:
+            await asyncio.wait_for(control.done(), timeout=1.5)
+        assert failure.value.code == "ERR_RSTREAM_CONTROL_LIVENESS"
+        engine_stream.write(b"after")
+        await engine_stream.drain()
+        assert (
+            await asyncio.wait_for(
+                engine_stream.readexactly(5),
+                timeout=0.5,
+            )
+            == b"AFTER"
+        )
+        engine_stream.close()
+        await engine_stream.wait_closed()
+        await tunnel.close()
+        await asyncio.gather(forwarding, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_accepted_stream_survives_liveness_timeout(tmp_path: Path) -> None:
+    async with await FakeEngine.start(tmp_path, liveness=(1_000, 1_000)) as engine:
+        control = await client_for(engine, heartbeat_interval=1.0).connect()
+        tunnel = await control.create_tunnel()
+        response_waiter = asyncio.create_task(
+            engine.request_proxy_connection(tunnel.id, "draining-accepted")
+        )
+        app_stream = await tunnel.accept()
+        engine_stream = await engine.next_proxy_stream()
+        response = await response_waiter
+        assert not response.proxy_conn_rsp.HasField("error")
+        engine_stream.write(b"before")
+        await engine_stream.drain()
+        assert await app_stream.readexactly(6) == b"before"
+        with pytest.raises(rstream.RstreamRuntimeError) as failure:
+            await asyncio.wait_for(control.done(), timeout=1.5)
+        assert failure.value.code == "ERR_RSTREAM_CONTROL_LIVENESS"
+        with pytest.raises(rstream.RstreamRuntimeError):
+            await tunnel.accept()
+        engine_stream.write(b"after")
+        await engine_stream.drain()
+        assert await app_stream.readexactly(5) == b"after"
+        app_stream.write(b"return")
+        await app_stream.drain()
+        assert await engine_stream.readexactly(6) == b"return"
+        app_stream.close()
+        engine_stream.close()
+        await asyncio.gather(
+            app_stream.wait_closed(),
+            engine_stream.wait_closed(),
+            return_exceptions=True,
+        )
+
+
+@pytest.mark.asyncio
+async def test_forwarded_stream_survives_control_transport_eof(tmp_path: Path) -> None:
+    server, host, port = await start_uppercase_server()
+    async with server, await FakeEngine.start(tmp_path) as engine:
+        control = await client_for(engine).connect()
+        tunnel = await control.create_tunnel()
+        forwarding = asyncio.create_task(tunnel.forward_to(host, port))
+        response_waiter = asyncio.create_task(
+            engine.request_proxy_connection(tunnel.id, "eof-forward")
+        )
+        engine_stream = await engine.next_proxy_stream()
+        response = await response_waiter
+        assert not response.proxy_conn_rsp.HasField("error")
+        await engine.close_control_transport()
+        with pytest.raises(asyncio.IncompleteReadError):
+            await asyncio.wait_for(control.done(), timeout=1)
+        engine_stream.write(b"survives")
+        await engine_stream.drain()
+        assert (
+            await asyncio.wait_for(
+                engine_stream.readexactly(8),
+                timeout=0.5,
+            )
+            == b"SURVIVES"
+        )
+        engine_stream.close()
+        await engine_stream.wait_closed()
+        await tunnel.close()
+        await asyncio.gather(forwarding, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_explicit_control_close_stops_forwarded_stream(tmp_path: Path) -> None:
+    server, host, port = await start_uppercase_server()
+    async with server, await FakeEngine.start(tmp_path) as engine:
+        control = await client_for(engine).connect()
+        tunnel = await control.create_tunnel()
+        forwarding = asyncio.create_task(tunnel.forward_to(host, port))
+        response_waiter = asyncio.create_task(
+            engine.request_proxy_connection(tunnel.id, "hard-close-forward")
+        )
+        engine_stream = await engine.next_proxy_stream()
+        response = await response_waiter
+        assert not response.proxy_conn_rsp.HasField("error")
+        await control.close()
+        assert await asyncio.wait_for(engine_stream.read(), timeout=0.5) == b""
+        engine_stream.close()
+        await engine_stream.wait_closed()
+        await asyncio.gather(forwarding, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_protocol_failure_stops_forwarded_stream(tmp_path: Path) -> None:
+    server, host, port = await start_uppercase_server()
+    async with server, await FakeEngine.start(tmp_path) as engine:
+        control = await client_for(engine).connect()
+        tunnel = await control.create_tunnel()
+        forwarding = asyncio.create_task(tunnel.forward_to(host, port))
+        response_waiter = asyncio.create_task(
+            engine.request_proxy_connection(tunnel.id, "protocol-close-forward")
+        )
+        engine_stream = await engine.next_proxy_stream()
+        response = await response_waiter
+        assert not response.proxy_conn_rsp.HasField("error")
+        await engine.send_heartbeat(acknowledgement=1)
+        with pytest.raises(rstream.ProtocolError):
+            await asyncio.wait_for(control.done(), timeout=0.5)
+        assert await asyncio.wait_for(engine_stream.read(), timeout=0.5) == b""
+        engine_stream.close()
+        await engine_stream.wait_closed()
+        await asyncio.gather(forwarding, return_exceptions=True)
+
+
+@pytest.mark.asyncio
 async def test_control_close_closes_an_unaccepted_proxy_stream(tmp_path: Path) -> None:
     async with await FakeEngine.start(tmp_path) as engine:
         control = await client_for(engine).connect()
@@ -741,6 +907,13 @@ class FakeEngine:
         writer.close()
         with suppress(ssl.SSLError, ConnectionError):
             await writer.wait_closed()
+
+    async def send_heartbeat(self, *, acknowledgement: int) -> None:
+        writer = self._control_writer
+        assert writer is not None
+        message = pb.Message()
+        message.heartbeat.acknowledgement = acknowledgement
+        await write_message(writer, message)
 
     async def _handle_connection(
         self,

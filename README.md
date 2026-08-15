@@ -148,6 +148,16 @@ await tunnel.forward_to("127.0.0.1", 8000)
 It keeps accepting rstream streams and relays them to the local TCP service
 until the tunnel or control channel is closed.
 
+The control channel uses a negotiated heartbeat deadline. If that deadline
+expires, or the control transport ends unexpectedly, the SDK immediately stops
+accepting new streams but lets already accepted streams and active
+`forward_to()` relays drain normally. This avoids interrupting an established
+application session because of a transient or asymmetric control-path outage.
+An explicit tunnel/control close or a protocol violation remains a hard close
+and terminates active local forwarding. Applications should use each stream's
+EOF/error as its payload-lifecycle signal; `control.done()` only describes the
+control plane.
+
 ## Private dial
 
 ```python

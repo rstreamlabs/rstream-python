@@ -444,9 +444,9 @@ class ControlChannel:
 
     def _fail(self, error: BaseException) -> None:
         self._close_error = error
-        self._finish()
+        self._finish(preserve_forwarders=_preserve_payloads_after(error))
 
-    def _finish(self) -> None:
+    def _finish(self, *, preserve_forwarders: bool = False) -> None:
         if self._closed:
             return
         self._closed = True
@@ -473,7 +473,7 @@ class ControlChannel:
             if not close_pending.done():
                 close_pending.set_exception(error)
         for tunnel in self._tunnels.values():
-            tunnel.on_close(error)
+            tunnel.on_close(error, preserve_forwarders=preserve_forwarders)
         self._pending_tunnels.clear()
         self._pending_closes.clear()
         self._tunnels.clear()
@@ -482,6 +482,12 @@ class ControlChannel:
                 self._done.set_result(None)
             else:
                 self._done.set_exception(self._close_error)
+
+
+def _preserve_payloads_after(error: BaseException) -> bool:
+    if isinstance(error, RuntimeError):
+        return error.code == "ERR_RSTREAM_CONTROL_LIVENESS"
+    return isinstance(error, (asyncio.IncompleteReadError, ConnectionError, OSError))
 
 
 def _normalize_bytestream_options(options: CreateTunnelOptions) -> TunnelProperties:
