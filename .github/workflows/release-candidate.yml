@@ -1,0 +1,58 @@
+name: Build release candidate
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build immutable Python distributions
+    if: ${{ github.actor == vars.CI_ALLOWED_ACTOR }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+){2}$ ]]; then
+            echo "invalid release version: ${version}" >&2
+            exit 1
+          fi
+          printf 'VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.13"
+      - name: Build and verify distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          if [[ "$package_version" != "$VERSION" ]]; then
+            echo "tag version ${VERSION} does not match package version ${package_version}" >&2
+            exit 1
+          fi
+          python -m pip install --upgrade pip build==1.5.0
+          python -m build
+          python scripts/verify_distribution.py dist
+          mkdir -p candidate/packages
+          mv dist/* candidate/packages/
+          (cd candidate && sha256sum -- packages/* > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-candidate-${{ env.VERSION }}
+          path: candidate
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
