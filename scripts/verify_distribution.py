@@ -14,7 +14,7 @@ from email.parser import BytesParser
 from pathlib import Path
 
 MAX_METADATA_BYTES = 1024 * 1024
-MAX_METADATA_VERSION = (2, 4)
+MAX_METADATA_VERSION = (2, 6)
 METADATA_VERSION_PATTERN = re.compile(r"^(\d+)\.(\d+)$")
 
 
