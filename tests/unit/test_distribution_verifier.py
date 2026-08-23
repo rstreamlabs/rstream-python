@@ -40,24 +40,24 @@ def verify(directory: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_accepts_matching_metadata_2_4(tmp_path: Path) -> None:
-    payload = metadata("2.4")
+def test_accepts_matching_metadata_2_6(tmp_path: Path) -> None:
+    payload = metadata("2.6")
     write_wheel(tmp_path, payload)
     write_sdist(tmp_path, payload)
     result = verify(tmp_path)
     assert result.returncode == 0
     assert result.stdout.strip() == (
-        "verified rstreamlabs-rstream 1.2.3 (metadata 2.4)"
+        "verified rstreamlabs-rstream 1.2.3 (metadata 2.6)"
     )
 
 
-def test_rejects_metadata_newer_than_publisher_support(tmp_path: Path) -> None:
-    payload = metadata("2.5")
+def test_rejects_metadata_with_newer_major_version(tmp_path: Path) -> None:
+    payload = metadata("3.0")
     write_wheel(tmp_path, payload)
     write_sdist(tmp_path, payload)
     result = verify(tmp_path)
     assert result.returncode != 0
-    assert "unsupported Metadata-Version 2.5" in result.stderr
+    assert "unsupported Metadata-Version 3.0" in result.stderr
 
 
 def test_rejects_wheel_and_sdist_version_mismatch(tmp_path: Path) -> None:
