@@ -15,6 +15,55 @@ from rstream.config import (
 from rstream.errors import ConfigurationError, UnsupportedFeatureError
 
 
+@pytest.mark.parametrize("environment", [False, True])
+def test_external_mtls_signer_is_explicitly_unsupported(
+    tmp_path: Path, environment: bool
+) -> None:
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        (
+            "environments:\n  - apiUrl: https://rstream.io\n"
+            if environment
+            else "contexts:\n  - name: external\n    engine: engine.example:443\n"
+        )
+        + """    auth:
+      mtls:
+        storage:
+          kind: exec
+          certificateSHA256: >-
+            0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          exec:
+            command: /nonexistent/identity-helper
+            args: [--slot, device]
+"""
+        + (
+            "contexts:\n  - name: external\n    apiUrl: https://rstream.io\n"
+            "    engine: engine.example:443\n"
+            if environment
+            else ""
+        )
+        + "  - name: software\n    apiUrl: https://other.example\n"
+        "    engine: software.example:443\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(UnsupportedFeatureError) as failure:
+        asyncio.run(
+            resolve_client_options(
+                ClientOptions(config_path=str(config), context="external")
+            )
+        )
+    assert failure.value.code == "ERR_RSTREAM_UNSUPPORTED_MTLS_STORAGE"
+    assert str(failure.value) == (
+        "mTLS storage provider 'exec' is not supported by rstream-python."
+    )
+    resolved = asyncio.run(
+        resolve_client_options(
+            ClientOptions(config_path=str(config), context="software", no_token=True)
+        )
+    )
+    assert resolved.engine == "software.example:443"
+
+
 def test_default_runtime_timeouts_are_resolved() -> None:
     resolved = asyncio.run(
         resolve_client_options(ClientOptions(read_config_file=False, no_token=True))
