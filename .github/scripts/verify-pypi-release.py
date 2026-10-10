@@ -24,8 +24,15 @@ def distribution_digests(directory: Path) -> dict[str, str]:
     distributions = sorted(
         path
         for path in directory.iterdir()
-        if path.name != "SHA256SUMS" and path.is_file()
+        if path.is_file() and path.name.endswith((".whl", ".tar.gz"))
     )
+    allowed = {path.name for path in distributions} | {"SHA256SUMS"}
+    allowed.update(f"{path.name}.publish.attestation" for path in distributions)
+    unexpected = sorted(
+        path.name for path in directory.iterdir() if path.name not in allowed
+    )
+    if unexpected:
+        raise ValueError(f"unexpected distribution files: {unexpected}")
     if not distributions:
         raise ValueError(f"no distributions found in {directory}")
     return {
