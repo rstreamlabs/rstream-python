@@ -30,6 +30,7 @@ from rstream.engine_api import (
     watch_events,
     watch_params_json,
 )
+from rstream.engine_discovery import EngineAPIDiscovery, has_client_certificate
 from rstream.errors import ConfigurationError, ProtocolError, RuntimeError
 from rstream.protocol import (
     engine_error_from_pb,
@@ -119,6 +120,7 @@ class Client:
         self._controls: set[ControlChannel] = set()
         self._control_watchers: set[asyncio.Task[None]] = set()
         self._closed = False
+        self._engine_discovery = EngineAPIDiscovery()
 
     @classmethod
     def from_env(
@@ -380,15 +382,19 @@ class Client:
         return EventStream(generate())
 
     async def _engine_api_target(self) -> tuple[str, str | None, TLSOptions | None]:
+        self._ensure_open()
         resolved = await self._get_resolved()
         engine = await self._resolve_engine(resolved)
         token = await self._resolve_token(resolved, engine)
+        if has_client_certificate(resolved.tls):
+            engine = await self._engine_discovery.resolve(engine, resolved.tls)
         return engine, token, resolved.tls
 
     async def close(self) -> None:
         if self._closed:
             return
         self._closed = True
+        await self._engine_discovery.close()
         failure: BaseException | None = None
         for control in tuple(self._controls):
             try:
