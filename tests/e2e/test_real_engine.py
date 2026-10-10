@@ -15,6 +15,16 @@ import rstream.asgi as rstream_asgi
 import rstream.wsgi as rstream_wsgi
 
 
+async def test_real_engine_certificate_http_inventory() -> None:
+    if os.environ.get("RSTREAM_PYTHON_E2E_ENGINE_API") != "1":
+        pytest.skip(
+            "Set RSTREAM_PYTHON_E2E_ENGINE_API=1 for Engine HTTP qualification."
+        )
+    async with real_engine_client(zero_rtt=False) as client:
+        await client.list_clients()
+        await client.list_tunnels()
+
+
 @pytest.mark.asyncio
 async def test_real_engine_private_bytestream_matrix() -> None:
     if not real_engine_enabled():
@@ -377,13 +387,17 @@ def real_engine_client(*, zero_rtt: bool) -> rstream.Client:
     ca_file = os.environ.get("RSTREAM_PYTHON_E2E_CA_FILE")
     insecure_skip_verify = os.environ.get("RSTREAM_PYTHON_E2E_TLS_INSECURE") == "1"
     server_name = os.environ.get("RSTREAM_PYTHON_E2E_SERVER_NAME")
+    cert_file = os.environ.get("RSTREAM_PYTHON_E2E_CERT_FILE")
+    key_file = os.environ.get("RSTREAM_PYTHON_E2E_KEY_FILE")
     tls = (
         rstream.TLSOptions(
             ca_file=ca_file,
             insecure_skip_verify=insecure_skip_verify,
             server_name=server_name,
+            cert_file=cert_file,
+            key_file=key_file,
         )
-        if ca_file or insecure_skip_verify or server_name
+        if ca_file or insecure_skip_verify or server_name or cert_file or key_file
         else None
     )
     return rstream.Client(

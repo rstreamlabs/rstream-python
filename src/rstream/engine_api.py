@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
-from rstream.config import TLSOptions
+from rstream.config import TLSOptions, create_ssl_context
 from rstream.errors import RuntimeError
 from rstream.types import TunnelProperties
 
@@ -239,12 +239,9 @@ def _require_httpx() -> Any:
 def _httpx_verify(tls: TLSOptions | None) -> object:
     if tls is None:
         return True
-    if tls.insecure_skip_verify:
-        return False
-    if tls.ca_file is not None:
-        context = ssl.create_default_context(cafile=tls.ca_file)
-        return context
-    return True
+    context, _ = create_ssl_context("localhost", tls)
+    context.set_alpn_protocols(["http/1.1"])
+    return context
 
 
 async def list_inventory(

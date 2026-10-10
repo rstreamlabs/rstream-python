@@ -287,3 +287,26 @@ the repository.
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## Engine HTTP access with certificates
+
+The existing `list_clients`, `list_tunnels` and `watch` methods support enrolled
+file-based mTLS identities. Keep one `Client` in an `async with` block. It discovers
+the dedicated project API through anonymous, verified HTTPS and caches the address
+in memory, normally for one hour. Concurrent callers share discovery; cancellation
+of one waiter does not cancel others, and closing the client cancels pending
+lookup work. No YAML field, persistent cache or new login is required.
+
+Discovery never sends the certificate, a token, cookies or Control plane headers,
+refuses redirects and verifies the server even when runtime TLS is marked insecure.
+The ordinary Engine hostname never requests a certificate. Runtime requests use
+the discovered authority with the existing identity and project permissions.
+Both SSE and WebSocket certificate watches use TLS/TCP. Python does not implement
+HTTP/3 or a TURN generation helper; use Go/JavaScript or the documented Engine API
+for TURN issuance. Control plane administration and region selectors still require
+a token; provision an explicit Engine address for a certificate-only device.
+
+Tests in `tests/integration/test_engine_mtls.py` use real TLS servers for discovery,
+inventory, both watch transports, trust validation and cancellation. Opt-in
+real-Engine inventory checks use `RSTREAM_PYTHON_E2E_ENGINE_API=1` with the
+existing E2E credential configuration.
