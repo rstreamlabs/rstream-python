@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/rstreamlabs/rstream-python/compare/v0.6.1...v0.7.0) (2026-10-10)
+
+
+### Features
+
+* discover and authenticate the Engine HTTP API with mTLS ([8a4fa00](https://github.com/rstreamlabs/rstream-python/commit/8a4fa008c16ccf819dc1b123beeb824bf29948f9))
+* discover and authenticate the Engine HTTP API with mTLS ([d99cb75](https://github.com/rstreamlabs/rstream-python/commit/d99cb7564474af974ce4f09e02a05467df30c34e))
+
 ## [0.6.1](https://github.com/rstreamlabs/rstream-python/compare/v0.6.0...v0.6.1) (2026-08-15)
 
 
