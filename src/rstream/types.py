@@ -23,6 +23,18 @@ class TunnelAuth:
 
 
 @dataclass(frozen=True)
+class HTTPCORS:
+    """Optional browser access policy for a published HTTP tunnel."""
+
+    allowed_origins: tuple[str, ...]
+    allowed_methods: tuple[str, ...] = ()
+    allowed_headers: tuple[str, ...] = ()
+    exposed_headers: tuple[str, ...] = ()
+    allow_credentials: bool = False
+    max_age: int = 0
+
+
+@dataclass(frozen=True)
 class TunnelProperties:
     """Tunnel properties accepted by the engine."""
 
@@ -51,6 +63,7 @@ class TunnelProperties:
     upstream_tls: bool | None = None
     datagram_guaranteed_delivery: bool | None = None
     allow_cross_region_routing: bool | None = None
+    http_cors: HTTPCORS | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +91,7 @@ class CreateTunnelOptions:
     upstream_tls: bool | None = None
     allow_cross_region_routing: bool | None = None
     auth: TunnelAuth | None = None
+    http_cors: HTTPCORS | None = None
 
 
 @dataclass(frozen=True)

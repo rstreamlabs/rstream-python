@@ -25,6 +25,7 @@ class ErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ERROR_CODE_FEATURE_NOT_AVAILABLE: _ClassVar[ErrorCode]
     ERROR_CODE_SERVICE_UNAVAILABLE: _ClassVar[ErrorCode]
     ERROR_CODE_CAPACITY_EXHAUSTED: _ClassVar[ErrorCode]
+    ERROR_CODE_RESOURCE_CONFLICT: _ClassVar[ErrorCode]
     ERROR_CODE_INTERNAL: _ClassVar[ErrorCode]
 ERROR_CODE_UNSPECIFIED: ErrorCode
 ERROR_CODE_UNAUTHORIZED: ErrorCode
@@ -37,6 +38,7 @@ ERROR_CODE_INVALID_STREAM: ErrorCode
 ERROR_CODE_FEATURE_NOT_AVAILABLE: ErrorCode
 ERROR_CODE_SERVICE_UNAVAILABLE: ErrorCode
 ERROR_CODE_CAPACITY_EXHAUSTED: ErrorCode
+ERROR_CODE_RESOURCE_CONFLICT: ErrorCode
 ERROR_CODE_INTERNAL: ErrorCode
 PROTOCOL_VERSION_FIELD_NUMBER: _ClassVar[int]
 protocol_version: _descriptor.FieldDescriptor
@@ -95,8 +97,24 @@ class ServerDetails(_message.Message):
     update: _wrappers_pb2.StringValue
     def __init__(self, agent: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., channel: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., plan: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., provider: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., region: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., update: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ...) -> None: ...
 
+class HttpCors(_message.Message):
+    __slots__ = ("allowed_origins", "allowed_methods", "allowed_headers", "exposed_headers", "allow_credentials", "max_age")
+    ALLOWED_ORIGINS_FIELD_NUMBER: _ClassVar[int]
+    ALLOWED_METHODS_FIELD_NUMBER: _ClassVar[int]
+    ALLOWED_HEADERS_FIELD_NUMBER: _ClassVar[int]
+    EXPOSED_HEADERS_FIELD_NUMBER: _ClassVar[int]
+    ALLOW_CREDENTIALS_FIELD_NUMBER: _ClassVar[int]
+    MAX_AGE_FIELD_NUMBER: _ClassVar[int]
+    allowed_origins: _containers.RepeatedScalarFieldContainer[str]
+    allowed_methods: _containers.RepeatedScalarFieldContainer[str]
+    allowed_headers: _containers.RepeatedScalarFieldContainer[str]
+    exposed_headers: _containers.RepeatedScalarFieldContainer[str]
+    allow_credentials: bool
+    max_age: int
+    def __init__(self, allowed_origins: _Optional[_Iterable[str]] = ..., allowed_methods: _Optional[_Iterable[str]] = ..., allowed_headers: _Optional[_Iterable[str]] = ..., exposed_headers: _Optional[_Iterable[str]] = ..., allow_credentials: _Optional[bool] = ..., max_age: _Optional[int] = ...) -> None: ...
+
 class TunnelProperties(_message.Message):
-    __slots__ = ("id", "creation_date", "name", "type", "publish", "protocol", "labels", "geoip", "trusted_ips", "host", "tls_mode", "tls_alpns", "tls_min_version", "tls_ciphers", "mtls_auth", "mtls_cacert_pem", "http_version", "http_use_tls", "token_auth", "rstream_auth", "challenge_mode", "hostname", "port", "upstream_tls", "datagram_guaranteed_delivery", "allow_cross_region_routing")
+    __slots__ = ("id", "creation_date", "name", "type", "publish", "protocol", "labels", "geoip", "trusted_ips", "host", "tls_mode", "tls_alpns", "tls_min_version", "tls_ciphers", "mtls_auth", "mtls_cacert_pem", "http_version", "http_use_tls", "token_auth", "rstream_auth", "challenge_mode", "hostname", "port", "upstream_tls", "datagram_guaranteed_delivery", "allow_cross_region_routing", "http_cors")
     class LabelsEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -130,6 +148,7 @@ class TunnelProperties(_message.Message):
     UPSTREAM_TLS_FIELD_NUMBER: _ClassVar[int]
     DATAGRAM_GUARANTEED_DELIVERY_FIELD_NUMBER: _ClassVar[int]
     ALLOW_CROSS_REGION_ROUTING_FIELD_NUMBER: _ClassVar[int]
+    HTTP_CORS_FIELD_NUMBER: _ClassVar[int]
     id: _wrappers_pb2.StringValue
     creation_date: _timestamp_pb2.Timestamp
     name: _wrappers_pb2.StringValue
@@ -156,7 +175,8 @@ class TunnelProperties(_message.Message):
     upstream_tls: _wrappers_pb2.BoolValue
     datagram_guaranteed_delivery: _wrappers_pb2.BoolValue
     allow_cross_region_routing: _wrappers_pb2.BoolValue
-    def __init__(self, id: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., creation_date: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., name: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., type: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., publish: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., protocol: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., labels: _Optional[_Mapping[str, str]] = ..., geoip: _Optional[_Iterable[str]] = ..., trusted_ips: _Optional[_Iterable[str]] = ..., host: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_mode: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_alpns: _Optional[_Iterable[str]] = ..., tls_min_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_ciphers: _Optional[_Iterable[str]] = ..., mtls_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., mtls_cacert_pem: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_use_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., token_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., rstream_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., challenge_mode: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., hostname: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., port: _Optional[_Union[_wrappers_pb2.UInt32Value, _Mapping]] = ..., upstream_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., datagram_guaranteed_delivery: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., allow_cross_region_routing: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ...) -> None: ...
+    http_cors: HttpCors
+    def __init__(self, id: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., creation_date: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., name: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., type: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., publish: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., protocol: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., labels: _Optional[_Mapping[str, str]] = ..., geoip: _Optional[_Iterable[str]] = ..., trusted_ips: _Optional[_Iterable[str]] = ..., host: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_mode: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_alpns: _Optional[_Iterable[str]] = ..., tls_min_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., tls_ciphers: _Optional[_Iterable[str]] = ..., mtls_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., mtls_cacert_pem: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_version: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., http_use_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., token_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., rstream_auth: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., challenge_mode: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., hostname: _Optional[_Union[_wrappers_pb2.StringValue, _Mapping]] = ..., port: _Optional[_Union[_wrappers_pb2.UInt32Value, _Mapping]] = ..., upstream_tls: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., datagram_guaranteed_delivery: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., allow_cross_region_routing: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., http_cors: _Optional[_Union[HttpCors, _Mapping]] = ...) -> None: ...
 
 class OpenControlChannelReq(_message.Message):
     __slots__ = ("client_details", "liveness")

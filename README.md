@@ -310,3 +310,9 @@ Tests in `tests/integration/test_engine_mtls.py` use real TLS servers for discov
 inventory, both watch transports, trust validation and cancellation. Opt-in
 real-Engine inventory checks use `RSTREAM_PYTHON_E2E_ENGINE_API=1` with the
 existing E2E credential configuration.
+
+## HTTP CORS
+
+Pass `http_cors=HTTPCORS(allowed_origins=("https://dashboard.example",), allowed_methods=("GET", "PUT"), allowed_headers=("Authorization",), exposed_headers=("ETag",), max_age=600)` to `create_tunnel` or `CreateTunnelOptions`. Import `HTTPCORS` from `rstream`.
+
+CORS requires a published HTTP tunnel. Allowed origins must be explicit HTTP(S) origins without paths or wildcards. Omitted method and request-header lists use GET/HEAD/POST and Authorization/Content-Type; credentials are disabled and max age is zero by default. An absent policy preserves upstream CORS. Engine answers valid preflights before request authentication, but every actual request still requires its usual authorization. No filesystem or upstream access is granted by a preflight. Deploy an Engine supporting protocol patch 1.4.6 before using this SDK version; the new Engine remains compatible with supported older clients.
