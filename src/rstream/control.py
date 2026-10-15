@@ -26,6 +26,7 @@ from rstream.protocol import (
 from rstream.stream import RstreamStream
 from rstream.tunnel import BytestreamTunnel
 from rstream.types import (
+    HTTPCORS,
     CreateTunnelOptions,
     HTTPVersion,
     ServerDetails,
@@ -125,6 +126,7 @@ class ControlChannel:
         upstream_tls: bool | None = None,
         allow_cross_region_routing: bool | None = None,
         auth: TunnelAuth | None = None,
+        http_cors: HTTPCORS | None = None,
     ) -> BytestreamTunnel:
         explicit_options = CreateTunnelOptions(
             name=name,
@@ -148,6 +150,7 @@ class ControlChannel:
             upstream_tls=upstream_tls,
             allow_cross_region_routing=allow_cross_region_routing,
             auth=auth,
+            http_cors=http_cors,
         )
         if options is not None and explicit_options != CreateTunnelOptions():
             raise RuntimeError(
@@ -494,6 +497,13 @@ def _preserve_payloads_after(error: BaseException) -> bool:
 
 
 def _normalize_bytestream_options(options: CreateTunnelOptions) -> TunnelProperties:
+    if options.http_cors is not None and (
+        options.publish is False or options.protocol not in (None, "http")
+    ):
+        raise RuntimeError(
+            "CORS requires a published HTTP tunnel.",
+            code="ERR_RSTREAM_INVALID_TUNNEL",
+        )
     if options.port is not None and options.protocol != "tcp":
         raise RuntimeError(
             "A published port requires protocol='tcp'.",
@@ -564,6 +574,7 @@ def _normalize_bytestream_options(options: CreateTunnelOptions) -> TunnelPropert
         tls_ciphers=tuple(options.tls_ciphers),
         mtls_auth=options.mtls_auth,
         http_version=options.http_version,
+        http_cors=options.http_cors,
         token_auth=token_auth,
         rstream_auth=rstream_auth,
         challenge_mode=challenge_mode,

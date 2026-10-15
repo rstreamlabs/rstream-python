@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from rstream.config import TLSOptions, create_ssl_context
 from rstream.errors import RuntimeError
-from rstream.types import TunnelProperties
+from rstream.types import HTTPCORS, TunnelProperties
 
 WatchTransport = Literal["sse", "websocket"]
 
@@ -149,7 +149,9 @@ def tunnel_inventory_from_json(data: Mapping[str, object]) -> TunnelInventory:
 
 def tunnel_properties_from_json(data: Mapping[str, object]) -> TunnelProperties:
     labels = data.get("labels")
+    cors = data.get("http_cors")
     return TunnelProperties(
+        http_cors=_http_cors_from_json(cors) if isinstance(cors, Mapping) else None,
         id=_optional_str(data, "id"),
         creation_date=_optional_datetime(data, "creation_date"),
         name=_optional_str(data, "name"),
@@ -431,3 +433,14 @@ def _string_tuple(data: Mapping[str, object], key: str) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(item for item in value if isinstance(item, str))
+
+
+def _http_cors_from_json(data: Mapping[str, object]) -> HTTPCORS:
+    return HTTPCORS(
+        allowed_origins=_string_tuple(data, "allowed_origins"),
+        allowed_methods=_string_tuple(data, "allowed_methods"),
+        allowed_headers=_string_tuple(data, "allowed_headers"),
+        exposed_headers=_string_tuple(data, "exposed_headers"),
+        allow_credentials=_optional_bool(data, "allow_credentials") or False,
+        max_age=_optional_int(data, "max_age") or 0,
+    )

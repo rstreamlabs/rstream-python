@@ -27,6 +27,7 @@ from rstream.stable_domains import engine_hostname, generate_stable_domain
 from rstream.stream import RstreamStream
 from rstream.tunnel import BytestreamTunnel, format_forwarding_address
 from rstream.types import (
+    HTTPCORS,
     CreateTunnelOptions,
     ServerDetails,
     TunnelAuth,
@@ -52,6 +53,7 @@ def __getattr__(name: str) -> ModuleType:
 
 
 __all__ = [
+    "HTTPCORS",
     "BytestreamTunnel",
     "Client",
     "ClientFilters",

@@ -15,6 +15,7 @@ from google.protobuf.wrappers_pb2 import BoolValue, StringValue, UInt32Value
 from rstream._proto import rstream_pb2 as pb
 from rstream.errors import EngineError, ProtocolError
 from rstream.types import (
+    HTTPCORS,
     HTTPVersion,
     ServerDetails,
     TLSMode,
@@ -159,11 +160,34 @@ def tunnel_properties_to_pb(properties: TunnelProperties) -> pb.TunnelProperties
         result.allow_cross_region_routing.CopyFrom(
             BoolValue(value=properties.allow_cross_region_routing)
         )
+    if properties.http_cors is not None:
+        config = properties.http_cors
+        result.http_cors.CopyFrom(
+            pb.HttpCors(
+                allowed_origins=config.allowed_origins,
+                allowed_methods=config.allowed_methods,
+                allowed_headers=config.allowed_headers,
+                exposed_headers=config.exposed_headers,
+                allow_credentials=config.allow_credentials,
+                max_age=config.max_age,
+            )
+        )
     return result
 
 
 def tunnel_properties_from_pb(properties: pb.TunnelProperties) -> TunnelProperties:
+    config = properties.http_cors
     return TunnelProperties(
+        http_cors=HTTPCORS(
+            allowed_origins=tuple(config.allowed_origins),
+            allowed_methods=tuple(config.allowed_methods),
+            allowed_headers=tuple(config.allowed_headers),
+            exposed_headers=tuple(config.exposed_headers),
+            allow_credentials=config.allow_credentials,
+            max_age=config.max_age,
+        )
+        if properties.HasField("http_cors")
+        else None,
         id=wrapper_string(optional_field(properties, "id", StringValue)),
         creation_date=wrapper_datetime(
             optional_field(properties, "creation_date", Timestamp)
