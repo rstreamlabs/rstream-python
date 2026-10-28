@@ -280,24 +280,28 @@ class ProxyRsp(_message.Message):
     def __init__(self, error: _Optional[_Union[Error, _Mapping]] = ...) -> None: ...
 
 class StreamReq(_message.Message):
-    __slots__ = ("client_details", "tunnel_id_name", "zero_rtt", "datagram_channel")
+    __slots__ = ("client_details", "tunnel_id_name", "zero_rtt", "datagram_channel", "independent_datagram_channel")
     CLIENT_DETAILS_FIELD_NUMBER: _ClassVar[int]
     TUNNEL_ID_NAME_FIELD_NUMBER: _ClassVar[int]
     ZERO_RTT_FIELD_NUMBER: _ClassVar[int]
     DATAGRAM_CHANNEL_FIELD_NUMBER: _ClassVar[int]
+    INDEPENDENT_DATAGRAM_CHANNEL_FIELD_NUMBER: _ClassVar[int]
     client_details: ClientDetails
     tunnel_id_name: str
     zero_rtt: _wrappers_pb2.BoolValue
     datagram_channel: _wrappers_pb2.BoolValue
-    def __init__(self, client_details: _Optional[_Union[ClientDetails, _Mapping]] = ..., tunnel_id_name: _Optional[str] = ..., zero_rtt: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., datagram_channel: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ...) -> None: ...
+    independent_datagram_channel: bool
+    def __init__(self, client_details: _Optional[_Union[ClientDetails, _Mapping]] = ..., tunnel_id_name: _Optional[str] = ..., zero_rtt: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., datagram_channel: _Optional[_Union[_wrappers_pb2.BoolValue, _Mapping]] = ..., independent_datagram_channel: _Optional[bool] = ...) -> None: ...
 
 class StreamRsp(_message.Message):
-    __slots__ = ("stream_id", "error")
+    __slots__ = ("datagram_channel_id", "stream_id", "error")
+    DATAGRAM_CHANNEL_ID_FIELD_NUMBER: _ClassVar[int]
     STREAM_ID_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
+    datagram_channel_id: bytes
     stream_id: str
     error: Error
-    def __init__(self, stream_id: _Optional[str] = ..., error: _Optional[_Union[Error, _Mapping]] = ...) -> None: ...
+    def __init__(self, datagram_channel_id: _Optional[bytes] = ..., stream_id: _Optional[str] = ..., error: _Optional[_Union[Error, _Mapping]] = ...) -> None: ...
 
 class DatagramChannelClose(_message.Message):
     __slots__ = ("stream_id", "error")
