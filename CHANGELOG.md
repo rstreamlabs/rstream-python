@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0](https://github.com/rstreamlabs/rstream-python/compare/v0.7.0...v0.8.0) (2026-10-28)
+
+
+### Features
+
+* **http:** expose optional tunnel CORS policies ([#19](https://github.com/rstreamlabs/rstream-python/issues/19)) ([06fe21c](https://github.com/rstreamlabs/rstream-python/commit/06fe21c70e24df3a61b611d8c7fbffebd065dbac))
+
+
+### Documentation
+
+* keep CORS guidance focused on usage ([#21](https://github.com/rstreamlabs/rstream-python/issues/21)) ([cbd572e](https://github.com/rstreamlabs/rstream-python/commit/cbd572ebc2806e4f43848d65fde6cb0555d4f329))
+
 ## [0.7.0](https://github.com/rstreamlabs/rstream-python/compare/v0.6.1...v0.7.0) (2026-10-10)
 
 
