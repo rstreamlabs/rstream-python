@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/rstreamlabs/rstream-python/compare/v0.8.0...v0.8.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* generate stable hostnames on the managed project domain ([#23](https://github.com/rstreamlabs/rstream-python/issues/23)) ([b331e9a](https://github.com/rstreamlabs/rstream-python/commit/b331e9a0f6e98ddacc7d6eda839e194cf92c28c5))
+
 ## [0.8.0](https://github.com/rstreamlabs/rstream-python/compare/v0.7.0...v0.8.0) (2026-10-28)
 
 
