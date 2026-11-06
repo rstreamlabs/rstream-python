@@ -290,7 +290,7 @@ class Client:
         return await self.dial(tunnel, token=token, zero_rtt=zero_rtt)
 
     async def generate_stable_hostname(self) -> str | None:
-        """Derive a stable, project-scoped hostname from the resolved engine.
+        """Derive a stable hostname from the public domain of the project.
 
         Generate it once and reuse it on every ``create_tunnel`` so a
         published tunnel keeps the same address across reconnects. Returns
@@ -299,7 +299,7 @@ class Client:
         """
         self._ensure_open()
         resolved = await self._get_resolved()
-        engine = await self._resolve_engine(resolved)
+        engine = await self._resolve_engine(resolved, for_stable_hostname=True)
         return generate_stable_domain(engine)
 
     async def list_tunnels(
@@ -497,7 +497,9 @@ class Client:
             "Timed out connecting to the rstream engine.",
         )
 
-    async def _resolve_engine(self, resolved: ResolvedClientOptions) -> str:
+    async def _resolve_engine(
+        self, resolved: ResolvedClientOptions, *, for_stable_hostname: bool = False
+    ) -> str:
         if resolved.region is None and resolved.engine is not None:
             return resolved.engine
         if resolved.project_endpoint is None:
@@ -513,7 +515,11 @@ class Client:
             control_plane_headers=resolved.control_plane_headers,
             credentials=credentials,
         ).resolve_tunnels_project(resolved.project_endpoint)
-        return engine_from_project(project, resolved.region)
+        engine = engine_from_project(project, resolved.region)
+        if for_stable_hostname and resolved.region is not None:
+            # The regional control endpoint and public tunnel domain can differ.
+            return engine_from_project(project)
+        return engine
 
     async def _resolve_token(
         self,

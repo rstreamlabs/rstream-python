@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 import rstream
+from rstream.api import RstreamAPIClient, TunnelsProject, TunnelsProjectRegionalEndpoint
 
 
 @pytest.mark.asyncio
@@ -39,3 +40,48 @@ async def test_with_options_preserves_timeout_overrides() -> None:
     assert resolved.engine == "localhost:9443"
     assert resolved.connect_timeout == 1.5
     assert resolved.operation_timeout == 2.5
+
+
+@pytest.mark.asyncio
+async def test_stable_hostname_uses_public_domain_with_regional_control(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = TunnelsProject(
+        id="test-id",
+        endpoint="abc123",
+        url=None,
+        domain="global.example.test",
+        engine_port=443,
+        routing="global",
+        regional_endpoints=(
+            TunnelsProjectRegionalEndpoint(
+                provider="aws",
+                region="eu-west-3",
+                domain="paris.example.test",
+                engine_port=8443,
+            ),
+        ),
+    )
+
+    async def lookup(_self: RstreamAPIClient, endpoint: str) -> TunnelsProject:
+        assert endpoint == project.endpoint
+        return project
+
+    monkeypatch.setattr(RstreamAPIClient, "resolve_tunnels_project", lookup)
+    async with rstream.Client(
+        project_endpoint=project.endpoint, region="eu-west-3", read_config_file=False
+    ) as client:
+        resolved = await client._get_resolved()
+        assert (
+            await client._resolve_engine(resolved) == "abc123.paris.example.test:8443"
+        )
+        hostname = await client.generate_stable_hostname()
+        assert hostname is not None and hostname.endswith(
+            "-abc123.t.global.example.test"
+        )
+
+    async with rstream.Client(
+        project_endpoint=project.endpoint, region="us-east-1", read_config_file=False
+    ) as client:
+        with pytest.raises(rstream.ConfigurationError, match="not available"):
+            await client.generate_stable_hostname()
