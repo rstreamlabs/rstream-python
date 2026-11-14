@@ -5,10 +5,10 @@ JavaScript, and C++ SDKs.
 
 ## Serve ASGI directly
 
-Install the optional ASGI extra:
+Install the ASGI extra and the framework used by this example:
 
 ```bash
-pip install "rstreamlabs-rstream[asgi]"
+pip install "rstreamlabs-rstream[asgi]" fastapi
 ```
 
 ```python
@@ -50,10 +50,10 @@ HTTP server.
 
 ## Serve WSGI directly
 
-Install the optional WSGI extra:
+Install the WSGI extra and Flask for this example:
 
 ```bash
-pip install "rstreamlabs-rstream[wsgi]"
+pip install "rstreamlabs-rstream[wsgi]" flask
 ```
 
 ```python
@@ -200,3 +200,21 @@ matching the Go and C++ SDKs. Generating it once and reusing it is what makes
 it stable; the method returns `None` for engines that are not managed project
 hosts, in which case the engine allocates an address. The pure derivation is
 `rstream.generate_stable_domain(engine)`.
+
+## Connection lifecycle
+
+The control channel uses a negotiated heartbeat deadline. If that deadline
+expires, or the control transport ends unexpectedly, the SDK immediately stops
+accepting new streams but lets already accepted streams and active
+`forward_to()` relays drain normally. This avoids interrupting an established
+application session because of a transient or asymmetric control-path outage.
+An explicit tunnel/control close or a protocol violation remains a hard close
+and terminates active local forwarding. Applications should use each stream's
+EOF/error as its payload-lifecycle signal; `control.done()` only describes the
+control plane.
+
+## HTTP CORS
+
+Pass `http_cors=HTTPCORS(allowed_origins=("https://dashboard.example",), allowed_methods=("GET", "PUT"), allowed_headers=("Authorization",), exposed_headers=("ETag",), max_age=600)` to `create_tunnel` or `CreateTunnelOptions`. Import `HTTPCORS` from `rstream`.
+
+CORS requires a published HTTP tunnel. Allowed origins must be explicit HTTP(S) origins without paths or wildcards. Omitted method and request-header lists use GET/HEAD/POST and Authorization/Content-Type; credentials are disabled and max age is zero by default. An absent policy preserves upstream CORS. Engine answers valid preflights before request authentication, but every actual request still requires its usual authorization. A preflight does not grant access to the upstream application.

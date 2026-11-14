@@ -1,105 +1,32 @@
 # rstream Python SDK
 
-`rstreamlabs-rstream` is the Python SDK for rstream tunnels and webhook
-receivers. Python code imports it as `rstream`.
+Connect Python applications to rstream without running a separate agent process. The SDK creates tunnels, dials private services and verifies webhook deliveries. Its async API fits `asyncio` applications, with adapters that serve ASGI and WSGI applications directly over accepted tunnel streams.
 
-The SDK is async-first, framework-neutral, and uses the same runtime protocol
-and CLI-compatible configuration model as the Go, JavaScript, Java, and C++
-SDKs. It is designed for Python services that need to publish local HTTP
-applications, dial private tunnels, accept bytestream tunnel connections
-directly, or verify rstream webhook deliveries in a backend framework.
+The package is named `rstreamlabs-rstream`; import it as `rstream`. Python 3.10 or newer is required.
 
-## SDK Surface
+## Where this SDK fits
 
-This repository targets Python 3.10 and newer.
+An rstream agent connects outbound to the edge, which routes traffic to the application and applies project and tunnel policy. Published tunnels provide a forwarding address; private tunnels are reached by name or ID through an authenticated rstream client.
 
-The first public release focuses on the Python-native surface that is ready for
-production use:
-
-| Area | Supported |
+| Integration | Python support |
 | --- | --- |
-| Runtime client | Async control-channel client |
-| Published tunnels | HTTP/1.1 bytestream tunnels |
-| Private tunnels | Dial by tunnel name or ID |
-| Local forwarding | `BytestreamTunnel.forward_to(host, port)` |
-| Direct accept | `await tunnel.accept()` and async iteration |
-| ASGI helper | Direct HTTP/1.1 bridge for ASGI apps |
-| WSGI helper | Direct HTTP/1.1 bridge for WSGI apps |
-| Live inventory | `client.list_tunnels()` and `client.list_clients()` with filters |
-| Real-time events | `client.watch()` over SSE or WebSocket |
-| Webhooks | Signature generation, verification, and event parsing |
-| Config | CLI-compatible YAML config and environment variables |
+| Application servers | Serve HTTP/1.1 through ASGI, WSGI or accepted bytestreams. |
+| Existing services | Forward tunnel connections to a local TCP port. |
+| Private connectivity | Dial bytestream tunnels by name or ID. |
+| Service discovery | Query inventory and watch lifecycle events with optional HTTP dependencies. |
+| Webhooks | Verify signatures and parse deliveries in your framework. |
 
-Datagram tunnels, QUIC runtime transport, HTTP/3 tunnel creation, custom
-transport proxies, and external credential stores are rejected explicitly by
-this SDK version instead of being ignored.
+The runtime connects to the engine over TLS. Datagram tunnels, QUIC runtime transport and HTTP/3 tunnel creation are outside this SDK’s current scope. For broader protocol support, see the [Go reference SDK](https://github.com/rstreamlabs/rstream-go).
 
-## Install
+## Publish a FastAPI application
 
-```bash
-pip install rstreamlabs-rstream
+Install the SDK’s ASGI adapter and FastAPI:
+
+```sh
+pip install "rstreamlabs-rstream[asgi]" fastapi
 ```
 
-For ASGI/FastAPI helpers:
-
-```bash
-pip install "rstreamlabs-rstream[asgi]"
-```
-
-For WSGI/Flask/Django helpers:
-
-```bash
-pip install "rstreamlabs-rstream[wsgi]"
-```
-
-For managed project endpoint discovery through the Control plane API:
-
-```bash
-pip install "rstreamlabs-rstream[api]"
-```
-
-For local example applications:
-
-```bash
-pip install "rstreamlabs-rstream[examples]"
-```
-
-## Configuration
-
-The SDK reads the same config file as the CLI by default:
-
-```text
-~/.rstream/config.yaml
-```
-
-Configuration is resolved in this order:
-
-1. Explicit `Client(...)` options.
-2. Environment variables.
-3. The selected context in the config file.
-4. SDK defaults.
-
-## Environment variables
-
-| Variable | Purpose |
-| --- | --- |
-| `RSTREAM_CONFIG` | Override the config file path. |
-| `RSTREAM_CONTEXT` | Select a context from the config file. |
-| `RSTREAM_ENGINE` | Use an explicit engine host and optional port. |
-| `RSTREAM_AUTHENTICATION_TOKEN` | Use an explicit authentication token. |
-| `RSTREAM_MTLS_CERT_FILE` | Client certificate file for mTLS authentication. |
-| `RSTREAM_MTLS_KEY_FILE` | Client private key file for mTLS authentication. |
-| `RSTREAM_API_URL` | Control plane API URL for managed project discovery. |
-| `RSTREAM_REGION` | Authorized region to select for a managed project. |
-| `RSTREAM_CONTROL_PLANE_HEADERS` | Additional Control plane request headers encoded as a JSON object. |
-
-`RSTREAM_ENGINE_ADDRESS` is also accepted for compatibility with older local
-SDK workflows. Prefer `RSTREAM_ENGINE` in new code.
-
-See [docs/001-configuration.md](docs/001-configuration.md) for supported YAML fields and
-error behavior.
-
-## FastAPI tunnel
+The SDK reads the [configuration](docs/001-configuration.md) selected with the rstream CLI. Set up a project context with `rstream login` and `rstream project use my-project-endpoint`, replacing the endpoint with your own. Servers and devices can use project-scoped credentials or certificate files instead.
 
 ```python
 import asyncio
@@ -133,186 +60,19 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-The ASGI helper parses accepted rstream streams and dispatches them to the app
-in-process. It does not start a loopback server.
+Save this as `main.py` and run `python main.py`. Open the printed forwarding address to reach the application. The adapter handles HTTP in-process, so no local listening port is needed. The [runnable FastAPI example](examples/fastapi-tunnel) includes interrupt handling.
 
-## Local forwarding
+## Documentation
 
-`forward_to()` remains available for existing services that already listen on a
-local TCP port:
-
-```python
-await tunnel.forward_to("127.0.0.1", 8000)
-```
-
-It keeps accepting rstream streams and relays them to the local TCP service
-until the tunnel or control channel is closed.
-
-The control channel uses a negotiated heartbeat deadline. If that deadline
-expires, or the control transport ends unexpectedly, the SDK immediately stops
-accepting new streams but lets already accepted streams and active
-`forward_to()` relays drain normally. This avoids interrupting an established
-application session because of a transient or asymmetric control-path outage.
-An explicit tunnel/control close or a protocol violation remains a hard close
-and terminates active local forwarding. Applications should use each stream's
-EOF/error as its payload-lifecycle signal; `control.done()` only describes the
-control plane.
-
-## Private dial
-
-```python
-import asyncio
-
-import rstream
-
-
-async def main() -> None:
-    async with (
-        rstream.Client.from_env() as client,
-        await client.dial("private-api") as stream,
-    ):
-        stream.write(b"ping")
-        await stream.drain()
-        print(await stream.read(1024))
-
-
-asyncio.run(main())
-```
-
-Private tunnels are addressed by name or ID. They do not expose a public
-forwarding address.
-
-## Live inventory and real-time events
-
-The engine exposes its live state through the same client. `list_tunnels` and
-`list_clients` return the current inventory, optionally filtered, and `watch`
-streams lifecycle events (`tunnel.created`, `tunnel.updated`,
-`tunnel.deleted`, and the client equivalents) as an async iterator. Label
-filters make the inventory usable as a service registry: tag tunnels at
-creation time, then discover them by label.
-
-```python
-import asyncio
-
-import rstream
-
-
-async def main() -> None:
-    async with rstream.Client.from_env() as client:
-        filters = rstream.TunnelFilters(labels={"role": "inference"})
-        for tunnel in await client.list_tunnels(filters=filters):
-            print(tunnel.properties.name, tunnel.status)
-        async for event in client.watch(tunnels=filters, transport="websocket"):
-            print(event.type, event.object)
-
-
-asyncio.run(main())
-```
-
-Listing and the SSE transport require the `api` extra (`pip install
-"rstreamlabs-rstream[api]"`); the WebSocket transport requires the `realtime` extra, which
-adds the `websockets` dependency. The watch connection uses the runtime token
-and ends when the surrounding task is cancelled.
-
-## Webhook receiver
-
-```python
-from fastapi import Request
-
-import rstream
-
-
-async def handle_webhook(request: Request) -> None:
-    payload = await request.body()
-    signature = request.headers["rstream-signature"]
-    secret = "whsec_..."
-
-    event = rstream.verify_event(payload, signature, secret)
-    resource_id = event.object.get("id")
-    if event.type == "tunnel.created":
-        print("Tunnel is online:", resource_id)
-```
-
-`event.id` is suitable for idempotency. Keep the raw request body unchanged when
-verifying the signature.
-
-See [docs/003-webhooks.md](docs/003-webhooks.md) for the payload shape and headers.
-
-## Examples
-
-| Example | Purpose |
+| Task | Guide |
 | --- | --- |
-| [examples/forward-local-port](examples/forward-local-port) | Publish an existing local TCP service. |
-| [examples/private-dial](examples/private-dial) | Dial a private tunnel by name or ID. |
-| [examples/fastapi-tunnel](examples/fastapi-tunnel) | Publish a FastAPI app through the direct ASGI helper. |
-| [examples/flask-tunnel](examples/flask-tunnel) | Publish a Flask app through the direct WSGI helper. |
-| [examples/django-tunnel](examples/django-tunnel) | Publish a Django app through the direct WSGI helper. |
-| [examples/aiohttp-local-forwarding](examples/aiohttp-local-forwarding) | Publish an aiohttp app through managed local forwarding. |
-| [examples/webhook-receiver](examples/webhook-receiver) | Verify webhook deliveries inside a FastAPI route. |
-| [examples/flask-webhook-receiver](examples/flask-webhook-receiver) | Verify webhook deliveries inside a Flask route. |
-| [examples/django-webhook-receiver](examples/django-webhook-receiver) | Verify webhook deliveries inside a Django view. |
+| Configure credentials, contexts and managed discovery | [Configuration](docs/001-configuration.md) |
+| Forward a service, accept streams or dial privately | [Tunnels](docs/002-tunnels.md) |
+| Integrate Flask, Django or another Python application | [Examples](examples/README.md) |
+| Receive lifecycle notifications | [Webhooks](docs/003-webhooks.md) |
+| Find advanced options or development checks | [Documentation index](docs/README.md) |
+| Contribute to the SDK | [Contributing](CONTRIBUTING.md) and [coding style](CODING_STYLE.md) |
 
-## Development
+## Security and support
 
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -e ".[dev]"
-ruff check .
-ruff format --check .
-mypy
-pytest
-python -m build
-```
-
-Real-engine tests are opt-in:
-
-```bash
-RSTREAM_PYTHON_E2E=1 pytest tests/e2e
-```
-
-See [docs/004-testing.md](docs/004-testing.md) for local-engine and managed-environment
-test commands.
-
-## Repository setup and release
-
-The intended GitHub repository is `rstreamlabs/rstream-python`. CI requires no
-secret for normal pull request checks. Release automation uses release-please and
-requires the maintainer-managed `RELEASE_PLEASE_TOKEN` secret plus the
-`CI_ALLOWED_ACTOR` repository variable.
-
-See [docs/006-github-setup.md](docs/006-github-setup.md) before creating or publishing
-the repository.
-
-## License
-
-Apache-2.0. See [LICENSE](LICENSE).
-
-## Engine HTTP access with certificates
-
-The existing `list_clients`, `list_tunnels` and `watch` methods support enrolled
-file-based mTLS identities. Keep one `Client` in an `async with` block. It discovers
-the dedicated project API through anonymous, verified HTTPS and caches the address
-in memory, normally for one hour. Concurrent callers share discovery; cancellation
-of one waiter does not cancel others, and closing the client cancels pending
-lookup work. No YAML field, persistent cache or new login is required.
-
-Discovery never sends the certificate, a token, cookies or Control plane headers,
-refuses redirects and verifies the server even when runtime TLS is marked insecure.
-The ordinary Engine hostname never requests a certificate. Runtime requests use
-the discovered authority with the existing identity and project permissions.
-Both SSE and WebSocket certificate watches use TLS/TCP. Python does not implement
-HTTP/3 or a TURN generation helper; use Go/JavaScript or the documented Engine API
-for TURN issuance. Control plane administration and region selectors still require
-a token; provision an explicit Engine address for a certificate-only device.
-
-Tests in `tests/integration/test_engine_mtls.py` use real TLS servers for discovery,
-inventory, both watch transports, trust validation and cancellation. Opt-in
-real-Engine inventory checks use `RSTREAM_PYTHON_E2E_ENGINE_API=1` with the
-existing E2E credential configuration.
-
-## HTTP CORS
-
-Pass `http_cors=HTTPCORS(allowed_origins=("https://dashboard.example",), allowed_methods=("GET", "PUT"), allowed_headers=("Authorization",), exposed_headers=("ETag",), max_age=600)` to `create_tunnel` or `CreateTunnelOptions`. Import `HTTPCORS` from `rstream`.
-
-CORS requires a published HTTP tunnel. Allowed origins must be explicit HTTP(S) origins without paths or wildcards. Omitted method and request-header lists use GET/HEAD/POST and Authorization/Content-Type; credentials are disabled and max age is zero by default. An absent policy preserves upstream CORS. Engine answers valid preflights before request authentication, but every actual request still requires its usual authorization. A preflight does not grant access to the upstream application.
+Use [Security](SECURITY.md) to report vulnerabilities privately. Usage questions and reproducible bugs belong in [GitHub issues](https://github.com/rstreamlabs/rstream-python/issues); remove credentials and customer identifiers before sharing a reproduction. Licensed under [Apache-2.0](LICENSE).
