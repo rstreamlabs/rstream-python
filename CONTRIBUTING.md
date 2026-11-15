@@ -13,13 +13,17 @@ See the [roadmap](roadmap/) for planned transport and lifecycle capabilities.
 
 ## Local setup
 
-Use Python 3.10 or newer:
+Use Python 3.10 or newer with `venv` and pip, Git, and network access for uncached dependencies. Some Linux distributions package `venv` separately. Work from a checkout, not an installed site-packages directory:
 
-```bash
+```sh
+git clone https://github.com/rstreamlabs/rstream-python.git
+cd rstream-python
 python -m venv .venv
 . .venv/bin/activate
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 ```
+
+On Windows, activate the environment with `.venv\Scripts\Activate.ps1` instead of the POSIX activation command. Editable installation makes imports use `src/rstream` from this checkout. Local unit and fake-engine tests do not need a rstream account; real-engine checks have separate explicit configuration in [Testing](docs/004-testing.md).
 
 ## Development checks
 

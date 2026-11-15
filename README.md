@@ -1,6 +1,8 @@
 # rstream Python SDK
 
-Connect Python applications to rstream without running a separate agent process. The SDK creates tunnels, dials private services and verifies webhook deliveries. Its async API fits `asyncio` applications, with adapters that serve ASGI and WSGI applications directly over accepted tunnel streams.
+rstream connects services and devices through outbound connections, so they can be reached without opening inbound ports on their hosts. This SDK embeds that connection in a Python application, without a separate agent process.
+
+Its async API fits `asyncio` services and workers. ASGI and WSGI adapters serve an existing web application directly over accepted tunnel streams; the same SDK can dial private services and verify webhook deliveries.
 
 The package is named `rstreamlabs-rstream`; import it as `rstream`. Python 3.10 or newer is required.
 
@@ -16,14 +18,20 @@ An rstream agent connects outbound to the edge, which routes traffic to the appl
 | Service discovery | Query inventory and watch lifecycle events with optional HTTP dependencies. |
 | Webhooks | Verify signatures and parse deliveries in your framework. |
 
-The runtime connects to the engine over TLS. Datagram tunnels, QUIC runtime transport and HTTP/3 tunnel creation are outside this SDK’s current scope. For broader protocol support, see the [Go reference SDK](https://github.com/rstreamlabs/rstream-go).
+The runtime connects to the engine over TLS. Datagram tunnels, QUIC runtime transport and HTTP/3 tunnel creation are outside this SDK’s current scope. The [SDK guide](https://rstream.io/docs/sdks) compares the available language and protocol choices.
 
 ## Publish a FastAPI application
 
-Install the SDK’s ASGI adapter and FastAPI:
+Use a Python virtual environment for the application:
 
 ```sh
-pip install "rstreamlabs-rstream[asgi]" fastapi
+python -m venv .venv
+```
+
+Activate it with `. .venv/bin/activate` on a POSIX shell or `.venv\Scripts\Activate.ps1` in Windows PowerShell. Then install the SDK's ASGI adapter and FastAPI:
+
+```sh
+python -m pip install "rstreamlabs-rstream[asgi]" fastapi
 ```
 
 The SDK reads the [configuration](docs/001-configuration.md) selected with the [rstream CLI](https://rstream.io/docs/getting-started/installation). Install the CLI, then select a project with `rstream login` and `rstream project use my-project-endpoint`, replacing the endpoint with your own. Servers and devices can use project-scoped credentials or certificate files instead.
