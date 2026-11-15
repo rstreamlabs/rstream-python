@@ -26,7 +26,7 @@ Install the SDK’s ASGI adapter and FastAPI:
 pip install "rstreamlabs-rstream[asgi]" fastapi
 ```
 
-The SDK reads the [configuration](docs/001-configuration.md) selected with the rstream CLI. Set up a project context with `rstream login` and `rstream project use my-project-endpoint`, replacing the endpoint with your own. Servers and devices can use project-scoped credentials or certificate files instead.
+The SDK reads the [configuration](docs/001-configuration.md) selected with the [rstream CLI](https://rstream.io/docs/getting-started/installation). Install the CLI, then select a project with `rstream login` and `rstream project use my-project-endpoint`, replacing the endpoint with your own. Servers and devices can use project-scoped credentials or certificate files instead.
 
 ```python
 import asyncio
