@@ -58,16 +58,19 @@ single request may contain more than one `v1` signature.
 | --- | --- | --- |
 | `id` | `str` | Event identifier for idempotency. |
 | `type` | `str` | Deliverable event type. |
-| `created_at` | `str | None` | Event creation timestamp, when available. |
-| `user_id` | `str | None` | User associated with the event, when available. |
-| `workspace_id` | `str | None` | Workspace associated with the event, when available. |
-| `project_id` | `str | None` | Project associated with the event, when available. |
-| `cluster_id` | `str | None` | Cluster associated with the event, when available. |
+| `created_at` | `str \| None` | Event creation timestamp, when available. |
+| `user_id` | `str \| None` | User associated with the event, when available. |
+| `workspace_id` | `str \| None` | Workspace associated with the event, when available. |
+| `project_id` | `str \| None` | Project associated with the event, when available. |
+| `cluster_id` | `str \| None` | Cluster associated with the event, when available. |
 | `object` | `Mapping[str, object]` | Event-specific resource snapshot. |
 | `raw` | `Mapping[str, object]` | Complete decoded payload. |
 
-The launch catalog contains `client.created`, `client.deleted`,
-`tunnel.created`, and `tunnel.deleted`.
+The Python parser accepts `client.created`, `client.deleted`, `tunnel.created`
+and `tunnel.deleted`. Select those types in the webhook destination's event
+filters. It rejects WebTTY events even when their signatures are valid; use a
+receiver that supports the [service event catalog](https://rstream.io/docs/integrations/webhooks#receiver-compatibility)
+when subscribing to those events.
 
 ## Framework examples
 
