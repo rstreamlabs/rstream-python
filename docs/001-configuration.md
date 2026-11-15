@@ -42,6 +42,10 @@ deployment access layer. Authentication, forwarding, and hop-by-hop headers are
 reserved; malformed values and case-insensitive duplicates are rejected before
 network I/O.
 
+## Trust the engine
+
+The TLS connection verifies the engine’s certificate and hostname. For a private CA, set `SSL_CERT_FILE` to its PEM bundle before starting Python, or configure the SDK’s `TLSOptions`. The engine address must match the certificate unless an explicit verification name is configured.
+
 ## Config file
 
 ```yaml
@@ -77,7 +81,7 @@ silently downgraded. Legacy `transport.useQuic` remains readable.
 
 ## Unsupported config
 
-The Python SDK v0.1 supports bytestream tunnels. It rejects unsupported
+The Python SDK supports bytestream tunnels. It rejects unsupported
 transport or credential storage settings instead of ignoring them:
 
 - QUIC transport.
