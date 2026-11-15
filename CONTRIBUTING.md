@@ -9,6 +9,8 @@ changes, configuration semantics, or new tunnel capabilities, open an issue or
 discussion first so the SDK behavior can stay aligned with the Go, JavaScript,
 Java, and C++ SDKs.
 
+See the [roadmap](roadmap/) for planned transport and lifecycle capabilities.
+
 ## Local setup
 
 Use Python 3.10 or newer:
