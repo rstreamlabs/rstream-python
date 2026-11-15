@@ -1,108 +1,53 @@
-# GitHub setup
+# Configure repository CI and releases
 
-This repository is intended to be published as `rstreamlabs/rstream-python`.
+This is a maintainer guide for `rstreamlabs/rstream-python`, not an application
+installation step. Applications use the published `rstreamlabs-rstream` package;
+contributors start with [Contributing](../CONTRIBUTING.md).
 
-## Create the repository
+## CI contract
 
-From the repository root:
+The configured CI matrix uses Python 3.10–3.15 on Linux, macOS and Windows. It
+runs Ruff, strict Mypy and the local pytest suite without a rstream account.
+A separate Python 3.13 job builds distributions and runs
+`scripts/verify_distribution.py`. Real-engine checks remain opt-in as described
+in [Testing](004-testing.md).
 
-```bash
-gh repo create rstreamlabs/rstream-python \
-  --private \
-  --source . \
-  --remote origin \
-  --push
-```
+Protect `main` with reviewed pull requests and required CI, and restrict force
+push/deletion. Normal source validation does not authorize a release.
 
-Keep the repository private until the first maintainer review is complete. After
-validation, make it public:
+## Release configuration
 
-```bash
-gh repo edit rstreamlabs/rstream-python --visibility public
-```
-
-Recommended repository settings:
-
-```bash
-gh repo edit rstreamlabs/rstream-python \
-  --enable-issues=true \
-  --enable-projects=false \
-  --enable-wiki=false
-```
-
-## Required CI settings
-
-The normal CI workflow does not require secrets. It runs on pushes to `main` and
-on pull requests:
-
-- Ruff lint and format check.
-- Mypy strict type check.
-- Pytest.
-- Source distribution and wheel build.
-- Linux, macOS, and Windows.
-- Python 3.10, 3.11, 3.12, and 3.13.
-
-Release automation requires:
-
-| Kind | Name | Purpose |
-| --- | --- | --- |
-| Repository variable | `CI_ALLOWED_ACTOR` | GitHub login allowed to run release-please on `main`. |
-| Repository secret | `RELEASE_PLEASE_TOKEN` | Token used by release-please to create and update release PRs. |
-
-`release-please-config.json` and `.release-please-manifest.json` are part of
-the repository contract. Keep both files versioned so release-please can update
-`pyproject.toml`, `src/rstream/version.py`, `CHANGELOG.md`, tags, and GitHub
-releases from the same manifest state.
-
-`RELEASE_PLEASE_TOKEN` should have the minimum permissions needed to write
-contents and pull requests in this repository. The workflow is guarded by
-`CI_ALLOWED_ACTOR` so regular contributors cannot trigger release automation.
-
-## Branch protection
-
-Before making the repository public, protect `main` with:
-
-- pull request required before merge;
-- CI required;
-- no force pushes;
-- no branch deletion;
-- linear history if that remains consistent with the rest of the rstream SDK
-  repositories.
-
-## PyPI publishing
-
-The package distribution name is `rstreamlabs-rstream`. The import package
-inside Python remains `rstream`, so application code uses `import rstream`.
-
-Prefer PyPI trusted publishing over a long-lived API token. Configure the PyPI
-project with:
-
-| Field | Value |
+| Setting | Purpose |
 | --- | --- |
-| Owner | `rstreamlabs` |
-| Repository | `rstream-python` |
-| Project name | `rstreamlabs-rstream` |
-| Workflow | the future publish workflow filename |
-| Environment | `pypi`, if an environment gate is used |
+| Repository variable `CI_ALLOWED_ACTOR` | Actor allowed to run release-please, candidate and promotion jobs. |
+| Repository secret `RELEASE_PLEASE_TOKEN` | Minimum required contents/PR authority for release-please. |
+| GitHub environment `pypi` | Protect stable promotion with the repository's maintainer approval policy. |
+| PyPI trusted publisher | Owner `rstreamlabs`, repository `rstream-python`, workflow `publish.yml`, environment `pypi`, project `rstreamlabs-rstream`. |
 
-This repository currently includes CI and release-please. Add the PyPI publish
-workflow only when the first public package release is approved.
+The existing promotion workflow requests `id-token: write` and uses PyPI trusted
+publishing; it does not need a long-lived PyPI API token. Configure the publisher
+and protected environment before attempting promotion. Do not replace this with
+an ambient personal token as a quick-start workaround.
 
-If trusted publishing is not available, use a scoped `PYPI_API_TOKEN` secret, but
-prefer keeping that path disabled until release policy is decided.
+Keep `release-please-config.json` and `.release-please-manifest.json` versioned.
+Release-please coordinates the Python package version, runtime version file,
+changelog, tag and draft GitHub release.
 
-## First push checklist
+## Candidate and stable promotion
 
-Before the first push:
+| Workflow | Input and result |
+| --- | --- |
+| `release-please.yml` | An allowed push on `main` prepares the release PR/draft and tag. |
+| `release-candidate.yml` | A `vX.Y.Z` tag verifies the version, builds wheel/sdist, validates them and retains a checksummed candidate for 90 days. It does not publish PyPI. |
+| `publish.yml` | Explicit `release_tag` dispatch selects the successful candidate with the matching tag commit, checks integrity and PyPI state, publishes those retained bytes and then the GitHub release. It never rebuilds the candidate. |
 
-```bash
-ruff check .
-ruff format --check .
-mypy
-pytest
-python -m build
-```
+Promotion requires the GitHub release to remain a draft and refuses an older
+release after a newer stable version. Existing PyPI files must match the retained
+candidate; retries use that same artifact, not a new build with the same version.
+Review the workflow and verification scripts when changing this contract.
 
-Also run at least one real-engine e2e command from [TESTING.md](004-testing.md)
-against a local or managed engine and record the command in the release notes or
-PR description.
+Before proposing a release, run the contributor checks, distribution verification
+and relevant explicit real-engine matrix; retain the commands, environment and
+results privately. An unrun opt-in test is not a passed qualification. Candidate
+creation, publishing and repository-visibility changes are separate maintainer
+operations and are not side effects of an ordinary build.

@@ -67,8 +67,7 @@ If an explicit engine override is provided, stored tokens or stored mTLS
 credentials from another context are refused. Pass an explicit token, explicit
 mTLS files, or `no_token=True` for local unauthenticated engines.
 
-The shared transport selector is available through `ClientOptions.tunnel_transport`
-and YAML:
+Select the shared transport through the environment variables above or YAML:
 
 ```yaml
 transport:
@@ -113,3 +112,32 @@ Both SSE and WebSocket certificate watches use TLS/TCP. Python does not implemen
 HTTP/3 or a TURN generation helper; use Go/JavaScript or the documented Engine API
 for TURN issuance. Control plane administration and region selectors still require
 a token; provision an explicit Engine address for a certificate-only device.
+
+## Client and TLS options
+
+`Client(...)` and `Client.from_env(...)` accept the same keyword options. The
+constructor does not connect; entering its async context gives the application a
+single owner that closes its control channels and HTTP discovery work.
+
+| Keyword | Default | Meaning |
+| --- | --- | --- |
+| `config_path`, `context`, `read_config_file` | shared path/default context; `True` | Select or disable shared YAML loading. Disabling YAML does not disable explicit/environment validation. |
+| `engine`, `project_endpoint`, `api_url`, `region` | resolved context | Direct Engine authority or managed project resolution; region requires managed metadata. |
+| `token`, `no_token`, `require_token` | resolved token; `None`; `False` | Explicit identity, suppress stored tokens, or require an authenticated identity (token or certificate). `no_token=True` is for a deliberately unauthenticated local Engine. |
+| `control_plane_headers` | empty | Additional deployment-access headers, subject to reserved-header validation. |
+| `tls` | verified system trust | `TLSOptions` for the native Engine connection and supported certificate API access. |
+| `connect_timeout`, `operation_timeout` | 15 / 30 seconds | Positive connection and protocol-operation budgets, not a complete application request deadline. |
+| `heartbeat`, `heartbeat_interval` | `True` / 5 seconds | Control admission liveness; enabled intervals are 1–300 seconds. Not a payload session lease. |
+| `zero_rtt` | `True` | Optimizes the rstream stream handshake; does not enable TLS early data. |
+
+`TLSOptions(ca_file=..., server_name=...)` adds a private CA and an intentional
+verification-name override. `cert_file`/`key_file` select an mTLS pair; inline
+`certificate`/`key` are also supported. `insecure_skip_verify` defaults to false
+and belongs only to isolated test fixtures. Never copy a personal CLI context to
+a deployed device; inject its own scoped token or enrolled certificate files.
+
+The exported low-level `ClientOptions` resolution model also represents
+`tunnel_transport`; the `Client` constructor currently selects transport through
+environment/YAML. Python's supported result remains TLS.
+
+For the complete creation surface and adapter limits, see [Tunnels](002-tunnels.md).

@@ -82,3 +82,47 @@ includes runnable receivers for the common cases:
 | FastAPI | [examples/webhook-receiver](../examples/webhook-receiver) |
 | Flask | [examples/flask-webhook-receiver](../examples/flask-webhook-receiver) |
 | Django | [examples/django-webhook-receiver](../examples/django-webhook-receiver) |
+
+## Try a local delivery
+
+Start the FastAPI receiver from `examples/webhook-receiver` using its README.
+In another terminal, use a configured CLI context and the same signing secret:
+
+```sh
+rstream events --webhook --webhook-secret "$RSTREAM_WEBHOOK_SECRET" \
+  --events tunnel.created,tunnel.deleted \
+  --forward-to http://127.0.0.1:8000/webhooks/rstream
+```
+
+Set `RSTREAM_WEBHOOK_SECRET` in both terminals before starting either process.
+Creating or closing a disposable tunnel in that project produces a verified
+request; the receiver prints its event ID and returns 200. A malformed signature
+returns 400. The CLI forwards live events locally; it does not configure durable
+Control plane destinations or retain retries after exit. A hosted destination
+cannot reach a loopback URL directly: publish a receiver deliberately and use
+its HTTPS address for that separate workflow.
+
+Return 2xx after processing or durable storage, and use `event.id` for idempotency.
+
+For a deterministic first check without a configured Engine, run the receiver with
+`RSTREAM_WEBHOOK_SECRET=whsec_local_example`. From the same example directory in
+another activated terminal, send one synthetic event:
+
+```sh
+RSTREAM_WEBHOOK_SECRET=whsec_local_example python - <<'PYTHON'
+import os
+from urllib.request import Request, urlopen
+import rstream
+
+body = b'{"id":"evt_local_example","type":"tunnel.created","object":{"id":"tun_local"}}'
+request = Request("http://127.0.0.1:8000/webhooks/rstream", data=body, headers={
+    "content-type": "application/json",
+    "rstream-signature": rstream.sign_payload(body, os.environ["RSTREAM_WEBHOOK_SECRET"]),
+})
+with urlopen(request, timeout=5) as response:
+    print(response.status, response.read().decode())
+PYTHON
+```
+
+The expected result is `200 {"received":true}`. This fixture secret is deliberately
+public and belongs only to the local example, never to a real webhook destination.

@@ -152,3 +152,74 @@ def load_example_module(example: str) -> ModuleType:
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["none", "connect", "serve", "cancel"])
+async def test_fastapi_entrypoint_owns_lifespan_on_success_and_failure(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    import asyncio
+    from collections.abc import AsyncIterator
+    from contextlib import asynccontextmanager
+    from unittest.mock import AsyncMock, MagicMock
+
+    from fastapi import FastAPI
+
+    module = load_example_module("fastapi_tunnel")
+    events: list[str] = []
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        app.state.ready = True
+        events.append("startup")
+        try:
+            yield
+        finally:
+            app.state.ready = False
+            events.append("shutdown")
+
+    application = FastAPI(lifespan=lifespan)
+    monkeypatch.setattr(module, "app", application)
+    tunnel = MagicMock(forwarding_address="https://example.test")
+    control = MagicMock()
+    control.__aenter__ = AsyncMock(return_value=control)
+    control.__aexit__ = AsyncMock(return_value=False)
+    control.create_tunnel = AsyncMock(return_value=tunnel)
+    client = MagicMock()
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+
+    async def connect() -> object:
+        assert application.state.ready
+        events.append("connect")
+        if failure == "connect":
+            raise RuntimeError("connect failed")
+        return control
+
+    async def serve(app: FastAPI, accepted: object) -> None:
+        assert app is application
+        assert accepted is tunnel
+        assert app.state.ready
+        events.append("serve")
+        if failure == "serve":
+            raise RuntimeError("serve failed")
+        if failure == "cancel":
+            raise asyncio.CancelledError
+
+    client.connect = connect
+    monkeypatch.setattr(rstream.Client, "from_env", lambda: client)
+    monkeypatch.setattr(rstream.asgi, "serve", serve)
+    expected = asyncio.CancelledError if failure == "cancel" else RuntimeError
+    if failure == "none":
+        await module.main()
+    else:
+        with pytest.raises(expected):
+            await module.main()
+    assert events == (
+        ["startup", "connect", "shutdown"]
+        if failure == "connect"
+        else ["startup", "connect", "serve", "shutdown"]
+    )
+    assert not application.state.ready
+    client.__aexit__.assert_awaited_once()

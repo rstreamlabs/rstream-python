@@ -1,5 +1,10 @@
 # Test matrix
 
+The configured CI matrix covers Python 3.10–3.15 on Linux, macOS and Windows; the package minimum is
+Python 3.10. Framework extras may select different dependency versions per Python
+release. This is a tested CI matrix, not a promise about every Python/platform
+combination. See `.github/workflows/ci.yml` and `pyproject.toml`.
+
 This matrix tracks the behavior that must stay covered before publishing the
 Python SDK.
 

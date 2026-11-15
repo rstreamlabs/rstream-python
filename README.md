@@ -53,6 +53,7 @@ async def root() -> dict[str, str]:
 
 async def main() -> None:
     async with (
+        app.router.lifespan_context(app),
         rstream.Client.from_env() as client,
         await client.connect() as control,
     ):
@@ -68,7 +69,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Save this as `main.py` and run `python main.py`. Open the printed forwarding address to reach the application. The adapter handles HTTP in-process, so no local listening port is needed. The [runnable FastAPI example](examples/fastapi-tunnel) includes interrupt handling.
+Save this as `main.py` and run `python main.py`. Open the printed forwarding address to reach the application. The adapter handles HTTP in-process, so no local listening port is needed. The [runnable FastAPI example](examples/fastapi-tunnel) includes interrupt handling and owns FastAPI startup/shutdown explicitly. The direct adapter is HTTP-only; see its [lifecycle and scope limits](docs/002-tunnels.md#own-the-application-lifecycle) before moving an existing application.
 
 ## Documentation
 

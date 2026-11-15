@@ -5,7 +5,7 @@ binding the app to a local port.
 
 ```bash
 pip install -e "../../[wsgi,examples]"
-RSTREAM_CONTEXT=tests python main.py
+python main.py
 ```
 
 The example opens a published HTTP tunnel, then passes each accepted stream to
