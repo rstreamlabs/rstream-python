@@ -110,7 +110,7 @@ class EngineAPIDiscovery:
             import httpx
         except ImportError as error:
             raise RuntimeError(
-                "Install rstream[api] to call the engine API.",
+                "Install rstreamlabs-rstream[api] to call the engine API.",
                 code="ERR_RSTREAM_API_EXTRA_REQUIRED",
             ) from error
         trust = ssl.create_default_context(cafile=tls.ca_file if tls else None)
