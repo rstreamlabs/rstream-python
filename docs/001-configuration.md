@@ -83,6 +83,7 @@ contexts:
     auth:
       token:
         storage:
+          kind: inline
           value: YOUR_PROJECT_TOKEN
     transport:
       mode: auto

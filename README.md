@@ -18,7 +18,7 @@ An rstream agent connects outbound to the edge, which routes traffic to the appl
 | Service discovery | Query inventory and watch lifecycle events with optional HTTP dependencies. |
 | Webhooks | Verify signatures and parse deliveries in your framework. |
 
-The runtime connects to the engine over TLS. Datagram tunnels, QUIC runtime transport and HTTP/3 tunnel creation are outside this SDK’s current scope. The [SDK guide](https://rstream.io/docs/sdks) compares the available language and protocol choices.
+The runtime connects to the engine over TLS. Datagram tunnels, QUIC runtime transport and HTTP/3 tunnel creation are outside this SDK’s current scope. The [SDK guide](https://rstream.io/sdks) compares the available language and protocol choices.
 
 ## Publish a FastAPI application
 

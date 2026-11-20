@@ -1,14 +1,16 @@
-# aiohttp local forwarding
+# Publish an aiohttp application
 
-Publish an aiohttp web application through managed local forwarding. aiohttp
-is not served by the direct ASGI or WSGI helpers here: it owns a loopback HTTP
-socket, while the SDK owns the rstream tunnel lifecycle and forwards accepted
-streams to that socket.
+aiohttp owns a loopback HTTP listener. The rstream SDK creates and owns a
+published tunnel that forwards to it.
 
-```bash
-python -m pip install -e "../..[api,examples]"
-python main.py
+Select a context that allows published HTTP tunnels using
+[SDK setup](../../docs/000-getting-started.md). From the checkout root, run:
+
+```sh
+python -m pip install -e ".[api,examples]"
+python examples/aiohttp-local-forwarding/main.py
 ```
 
-Use the FastAPI, Flask, or Django examples when the framework can be served
-directly from rstream streams without a loopback port.
+Open the printed HTTPS URL and expect HTTP 200 with
+`{"framework":"aiohttp","ok":true}`. Stop with Ctrl+C to close the tunnel and
+the local server.
