@@ -10,7 +10,7 @@ The configured CI matrix uses Python 3.10–3.15 on Linux, macOS and Windows. It
 runs Ruff, strict Mypy and the local pytest suite without a rstream account.
 A separate Python 3.13 job builds distributions and runs
 `scripts/verify_distribution.py`. Real-engine checks remain opt-in as described
-in [Testing](004-testing.md).
+in [Testing](../docs/004-testing.md).
 
 Protect `main` with reviewed pull requests and required CI, and restrict force
 push/deletion. Normal source validation does not authorize a release.

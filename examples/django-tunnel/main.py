@@ -24,7 +24,7 @@ def configure_django() -> None:
     if not settings.configured:
         settings.configure(
             ALLOWED_HOSTS=["*"],
-            DEBUG=True,
+            DEBUG=False,
             DEFAULT_AUTO_FIELD="django.db.models.BigAutoField",
             INSTALLED_APPS=[],
             MIDDLEWARE=[],

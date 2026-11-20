@@ -1,21 +1,20 @@
-# Python SDK documentation
+# Python SDK guides
 
-Start with the [repository overview](../README.md) for installation and a first application. The integration guides below explain the SDK’s behavior and options.
+The SDK brings outbound rstream connectivity into Python applications.
+It can serve HTTP directly, relay to an existing server and dial private
+services.
 
-## Build an integration
+| Start here | Use this guide |
+| --- | --- |
+| Install the SDK or run the checkout | [Run a first Python application](000-getting-started.md). |
+| Pick an application boundary | [Choose a tunnel integration](002-tunnels.md). |
+| Find a complete integration for a framework | [Example catalog](../examples/README.md). |
 
-| Guide                                 | Use it to                                                           |
-| ------------------------------------- | ------------------------------------------------------------------- |
-| [Configuration](001-configuration.md) | Select a context, credentials and an engine.                        |
-| [Tunnels](002-tunnels.md)             | Create published services, accept streams and dial private tunnels. |
-| [Examples](../examples/README.md)     | Start from a runnable integration for your application.             |
-| [Webhooks](003-webhooks.md)           | Verify and process lifecycle notifications.                         |
+| When you need to | Read |
+| --- | --- |
+| Set credentials, Engine and CA trust | [Configuration](001-configuration.md). |
+| Handle disconnects and stop an application | [Tunnel lifecycle](tunnels/002-lifecycle.md). |
+| Discover services or observe tunnel changes | [List and watch live tunnels](tunnels/003-inventory.md). |
+| Receive lifecycle notifications | [Webhooks](003-webhooks.md). |
 
-## Develop the SDK
-
-| Guide                                           | Scope                                              |
-| ----------------------------------------------- | -------------------------------------------------- |
-| [Contributing](../CONTRIBUTING.md)              | Local setup, style and change expectations.        |
-| [Testing](004-testing.md)                       | Unit, local fixture and opt-in real-engine checks. |
-| [Compatibility matrix](005-test-matrix.md)      | Runtime and platform coverage.                     |
-| [Repository automation](006-ci-and-releases.md) | Maintainer CI and release configuration.           |
+[Contributing](../CONTRIBUTING.md) covers development setup and tests.

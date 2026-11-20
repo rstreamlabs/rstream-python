@@ -23,7 +23,7 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
-On Windows, activate the environment with `.venv\Scripts\Activate.ps1` instead of the POSIX activation command. Editable installation makes imports use `src/rstream` from this checkout. Local unit and fake-engine tests do not need a rstream account; real-engine checks have separate explicit configuration in [Testing](docs/004-testing.md).
+On Windows, activate the environment with `.\.venv\Scripts\Activate.ps1` instead of the POSIX activation command. Editable installation makes imports use `src/rstream` from this checkout. Local unit and fake-engine tests do not need a rstream account; real-engine checks have separate explicit configuration in [Testing](docs/004-testing.md).
 
 ## Development checks
 
@@ -63,7 +63,7 @@ Use the smallest test that exercises the behavior:
 - framework example tests when changing sample integrations;
 - opt-in e2e tests for real engines and managed environments.
 
-See [docs/004-testing.md](docs/004-testing.md) for the e2e matrix.
+See [Testing](docs/004-testing.md) for commands, the [test coverage](tests/README.md) for suite scope and [repository automation](.github/README.md) for releases.
 
 ## Generated code
 

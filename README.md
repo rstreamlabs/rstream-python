@@ -22,22 +22,13 @@ The runtime connects to the engine over TLS. Datagram tunnels, QUIC runtime tran
 
 ## Publish a FastAPI application
 
-Use a Python virtual environment for the application:
-
-```sh
-python -m venv .venv
-```
-
-Activate it with `. .venv/bin/activate` on a POSIX shell or `.venv\Scripts\Activate.ps1` in Windows PowerShell. Then install the SDK's ASGI adapter and FastAPI:
-
-```sh
-python -m pip install "rstreamlabs-rstream[asgi]" fastapi
-```
-
-The SDK reads the [configuration](docs/001-configuration.md) selected with the [rstream CLI](https://rstream.io/docs/getting-started/installation). Install the CLI, then select a project with `rstream login` and `rstream project use my-project-endpoint`, replacing the endpoint with your own. Servers and devices can use project-scoped credentials or certificate files instead.
+[Install the package and select a project](https://github.com/rstreamlabs/rstream-python/blob/main/docs/000-getting-started.md).
+This application owns FastAPI startup and shutdown and serves requests
+directly over the tunnel.
 
 ```python
 import asyncio
+from contextlib import suppress
 
 from fastapi import FastAPI
 
@@ -62,25 +53,27 @@ async def main() -> None:
             http_version="http/1.1",
             publish=True,
         )
-        print("Forwarding address:", tunnel.forwarding_address)
+        print("Forwarding address:", tunnel.forwarding_address, flush=True)
         await rstream.asgi.serve(app, tunnel)
 
 
-asyncio.run(main())
+with suppress(KeyboardInterrupt):
+    asyncio.run(main())
 ```
 
-Save this as `main.py` and run `python main.py`. Open the printed forwarding address to reach the application. The adapter handles HTTP in-process, so no local listening port is needed. The [runnable FastAPI example](examples/fastapi-tunnel) includes interrupt handling and owns FastAPI startup/shutdown explicitly. The direct adapter is HTTP-only; see its [lifecycle and scope limits](docs/002-tunnels.md#own-the-application-lifecycle) before moving an existing application.
+Run `python main.py` and open the forwarding address to receive
+`{"status":"ok"}`. The [first-application guide](https://github.com/rstreamlabs/rstream-python/blob/main/docs/000-getting-started.md)
+explains how to verify the endpoint and build the checkout.
 
 ## Documentation
 
 | Task | Guide |
 | --- | --- |
-| Configure credentials, contexts and managed discovery | [Configuration](docs/001-configuration.md) |
-| Forward a service, accept streams or dial privately | [Tunnels](docs/002-tunnels.md) |
-| Integrate Flask, Django or another Python application | [Examples](examples/README.md) |
-| Receive lifecycle notifications | [Webhooks](docs/003-webhooks.md) |
-| Find advanced options or development checks | [Documentation index](docs/README.md) |
-| Contribute to the SDK | [Contributing](CONTRIBUTING.md) and [coding style](CODING_STYLE.md) |
+| Install the SDK or build the checkout | [Getting started](https://github.com/rstreamlabs/rstream-python/blob/main/docs/000-getting-started.md) |
+| Serve an application or forward an existing port | [Choose a tunnel integration](https://github.com/rstreamlabs/rstream-python/blob/main/docs/002-tunnels.md) |
+| Find an equivalent Flask, Django or asyncio example | [Example catalog](https://github.com/rstreamlabs/rstream-python/blob/main/examples/README.md) |
+| Configure credentials or verify a webhook | [Documentation index](https://github.com/rstreamlabs/rstream-python/blob/main/docs/README.md) |
+| Develop the SDK | [Contributing](https://github.com/rstreamlabs/rstream-python/blob/main/CONTRIBUTING.md) |
 
 ## Security and support
 

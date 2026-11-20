@@ -6,7 +6,7 @@ socket, while the SDK owns the rstream tunnel lifecycle and forwards accepted
 streams to that socket.
 
 ```bash
-pip install -e "../../[examples]"
+python -m pip install -e "../..[api,examples]"
 python main.py
 ```
 
