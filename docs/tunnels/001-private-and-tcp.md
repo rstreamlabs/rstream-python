@@ -31,7 +31,9 @@ python examples/private-dial/main.py python-private-http
 Expect an HTTP 200 status and `hello through Python`. The caller opens the stream by name or ID, sends an HTTP
 request and reads until EOF. The tunnel carries bytes and can carry another
 protocol when both endpoints speak it. Keep the loopback service and tunnel
-owner running until the request completes.
+owner running until the request completes. Then stop both with Ctrl+C.
+From the origin's terminal, remove the test directory with
+`rm -r -- "$demo_dir"`.
 
 To own the server side in Python, create a tunnel with `publish=False`
 and `name="python-private-http"`. Use `await tunnel.accept()` for one

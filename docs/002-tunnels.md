@@ -81,7 +81,7 @@ Do not treat inventory-only `id`, `host` or `creation_date` as creation inputs.
 | `http_cors` | Explicit published HTTP browser-origin policy; see below. |
 | `tls_mode`, `tls_min_version`, `tls_alpns`, `tls_ciphers`, `mtls_auth` | Published TLS termination/passthrough and downstream certificate policy. Passthrough leaves TLS policy to the application. |
 | `trusted_ips`, `geo_ip` | Published source-address/country restrictions, enforced by the Engine. |
-| `allow_cross_region_routing` | Override the project's private-routing choice where supported; not a region selector for the client. |
+| `allow_cross_region_routing` | Override the cross-region routing policy for an eligible published or private tunnel. Select the client's region separately. |
 
 Private tunnels reject public exposure/authentication options. Private protocol
 inspection options are supported where the Engine accepts them; an opaque private

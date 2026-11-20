@@ -56,6 +56,11 @@ at every `state.initial` and apply the subsequent create, update and
 delete events. The watch can send a new snapshot on an existing
 connection as well as after reconnecting.
 
+Call `await client.list_clients(filters=...)` with a `rstream.ClientFilters`
+instance to list runtime clients. Pass the same filter to `client.watch(clients=...)`
+to watch client changes. A context needs permission and scope to see those
+resources. Both list methods accept a `limit` for a bounded result.
+
 The default transport is server-sent events. Install the `realtime` extra
 and use `transport="websocket"` if the application requires WebSockets.
 The SDK also supports [certificate-based inventory and watches](../001-configuration.md#engine-http-access-with-certificates)

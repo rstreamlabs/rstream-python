@@ -131,7 +131,8 @@ discovery work.
 | `token`, `no_token`, `require_token` | Set a credential, suppress token lookup, or require an authenticated identity. |
 | `tls` | Configure CA trust, certificate identity and optional client certificate files through `TLSOptions`. |
 | `connect_timeout`, `operation_timeout` | Bounds for connection and protocol operations. Defaults to 15 and 30 seconds. |
-| `heartbeat`, `heartbeat_interval` | Controls admission liveness. Heartbeats are enabled by default with a five-second interval. |
+| `heartbeat`, `heartbeat_interval` | Controls admission liveness. Heartbeats default to a five-second interval. When enabled, the interval accepts 1 to 300 seconds with millisecond precision. |
+| `zero_rtt` | Optimizes the rstream stream handshake. Defaults to `True`. This setting is independent of TLS early data. |
 | `control_plane_headers` | Add validated headers for a deployment access layer. |
 
 Use the [tunnel guide](002-tunnels.md) for stream lifetimes and

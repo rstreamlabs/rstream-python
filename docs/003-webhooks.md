@@ -123,6 +123,7 @@ print("Changed bytes:", send(body + b" "))
 Expect `Signed bytes: 200` and `Changed bytes: 400`. The second request is
 still JSON, but its bytes differ from those that were signed. A framework
 may reject a missing header before calling the SDK verifier.
+Stop the receiver with Ctrl+C when finished.
 
 ## Receive live events locally
 
@@ -142,6 +143,7 @@ rstream events --webhook --webhook-secret "$env:RSTREAM_WEBHOOK_SECRET" --events
 ```
 
 Create or close a tunnel in the selected project to send a signed request.
+Stop the CLI forwarder and receiver with Ctrl+C when finished.
 A hosted destination needs a reachable HTTPS receiver. Configure it
 separately through the [product webhook guide](https://rstream.io/docs/integrations/webhooks).
 Return 2xx after processing or durable storage, and use the signed event

@@ -37,9 +37,9 @@ database or filesystem work out of the asyncio event loop.
 
 | Setting | Default | Effect |
 | --- | --- | --- |
-| `max_header_size` | 64 KiB | Limits request headers. |
+| `max_header_size` | 64 KiB | Limits the parser's buffered bytes while it waits for a complete event, typically the request headers. |
 | `max_body_size` | 16 MiB | Limits request bodies. |
-| `read_timeout` | 30 seconds | Bounds request reads. `None` disables that timeout. |
+| `read_timeout` | 30 seconds | Bounds each wait for request data. `None` disables that timeout. |
 
 These are adapter arguments. Use the [client configuration](../001-configuration.md)
 for Engine and operation timeouts.
