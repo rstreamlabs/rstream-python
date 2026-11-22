@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.8.2](https://github.com/rstreamlabs/rstream-python/compare/v0.8.1...v0.8.2) (2026-11-22)
+
+
+### Documentation
+
+* align async SDK onboarding and framework prerequisites ([a0167fe](https://github.com/rstreamlabs/rstream-python/commit/a0167feb3a3e96134b1635ad60f3d7633838d2f9))
+* align repository guidance and agent entry points ([90348b3](https://github.com/rstreamlabs/rstream-python/commit/90348b36b038b0d861cf88d1c085436d6e73272a))
+* clarify Python certificate trust and current capabilities ([f2e2d8f](https://github.com/rstreamlabs/rstream-python/commit/f2e2d8ff3419ea029292ec778af4d8f9129d9895))
+* clarify Python setup and verified engine tests ([0cd7ac8](https://github.com/rstreamlabs/rstream-python/commit/0cd7ac8b688c8347805627f08cbf41864d6feb7e))
+* describe remaining Python transport and lifecycle work ([465d2a4](https://github.com/rstreamlabs/rstream-python/commit/465d2a4546d4d8c4ce6b79e18534a8b89ba45b73))
+* document supported webhook events and fix field table ([d9241b0](https://github.com/rstreamlabs/rstream-python/commit/d9241b0e51a2941df79836263d9b4a413190a809))
+* keep public references independent of private repositories ([c5a9704](https://github.com/rstreamlabs/rstream-python/commit/c5a9704ca33f71ef0a932f01450c7b8b39712c14))
+* link CLI installation before Python setup ([9d74403](https://github.com/rstreamlabs/rstream-python/commit/9d744034806dfd5e3fc9aae280d5afb3e2dcab6d))
+* name the maintainer CI and release guide explicitly ([75f0b8e](https://github.com/rstreamlabs/rstream-python/commit/75f0b8ec6c36a79aae08ab193517ff782a32e3f4))
+
 ## [0.8.1](https://github.com/rstreamlabs/rstream-python/compare/v0.8.0...v0.8.1) (2026-11-06)
 
 
