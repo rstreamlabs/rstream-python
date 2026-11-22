@@ -31,7 +31,7 @@ It covers:
 | Suite | Coverage |
 | --- | --- |
 | `tests/unit` | Config resolution, protocol framing, streams, tunnel objects, API helpers, direct ASGI and WSGI helpers, webhook signatures. |
-| `tests/integration` | TLS fake engine, control-channel lifecycle, tunnel creation and close, stream handshakes, zero-RTT, proxy delivery, timeout and retry behavior. |
+| `tests/integration` | TLS fake engine, control-channel lifecycle, tunnel creation and close, stream handshakes, the SDK `zero_rtt` option, proxy delivery, timeout and retry behavior. |
 | `tests/examples` | Syntax compilation for every example plus FastAPI, Flask, and Django receivers with valid and invalid webhook signatures. |
 
 ## Real-engine e2e
@@ -43,7 +43,7 @@ RSTREAM_PYTHON_E2E=1 pytest tests/e2e
 ```
 
 The private-tunnel e2e matrix creates a tunnel, dials it by name and ID, runs
-zero-RTT both enabled and disabled, exercises concurrent dials, and validates a
+the SDK stream-handshake `zero_rtt` option both enabled and disabled, exercises concurrent dials, and validates a
 direct WSGI handler through a private tunnel.
 
 Published HTTP tunnel checks are opt-in because they require the engine to serve
@@ -68,30 +68,29 @@ pytest tests/e2e
 Set `RSTREAM_PYTHON_E2E_PUBLISHED_CONNECT_HOST` when the hostname returned by a
 local engine is not directly resolvable from the test process.
 
-When bypassing the shared rstream config file, pass explicit engine settings:
+When bypassing the shared rstream config file, pass explicit engine settings.
+For a private CA, keep certificate verification enabled:
 
 ```bash
+RSTREAM_PYTHON_E2E=1 \
 RSTREAM_PYTHON_E2E_ENGINE="c.localhost.rstream.io:9443" \
 RSTREAM_PYTHON_E2E_TOKEN="$RSTREAM_AUTHENTICATION_TOKEN" \
-RSTREAM_PYTHON_E2E_TLS_INSECURE=1 \
+RSTREAM_PYTHON_E2E_CA_FILE="/path/to/local-ca.pem" \
 pytest tests/e2e
 ```
 
-If the local engine uses a private CA, prefer
-`RSTREAM_PYTHON_E2E_CA_FILE="/path/to/local-ca.pem"` instead of
-`RSTREAM_PYTHON_E2E_TLS_INSECURE=1`. `RSTREAM_PYTHON_E2E_SERVER_NAME` is only
-needed when the certificate name intentionally differs from the engine host.
+Set `RSTREAM_PYTHON_E2E_SERVER_NAME` only when the certificate name intentionally
+differs from the engine host. `RSTREAM_PYTHON_E2E_TLS_INSECURE=1` disables
+certificate verification and is reserved for isolated throwaway fixtures
+without a trusted certificate.
 
-## Local EE engine
+The `zero_rtt` option tested here controls the rstream stream handshake; it does
+not enable TLS 1.3 early data.
 
-The engine repository documents the full local setup in its Enterprise Edition
-runtime README:
+## Local self-hosted engine
 
-```text
-cmd/rstream-engine-ee/README.md
-```
-
-Start the EE engine, select the test context, then run:
+Follow the [self-hosted engine guide](https://rstream.io/docs/tunnels/self-hosted)
+to configure a local engine, select its CLI context and run:
 
 ```bash
 RSTREAM_CONTEXT=tests \
@@ -100,3 +99,6 @@ RSTREAM_PYTHON_E2E_PUBLISHED=1 \
 RSTREAM_PYTHON_E2E_PUBLISHED_TCP=1 \
 pytest tests/e2e
 ```
+
+Enable published checks only when the local engine supports them and its
+forwarding addresses are reachable from the test process.

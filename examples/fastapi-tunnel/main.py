@@ -16,7 +16,11 @@ async def root() -> dict[str, str]:
 
 
 async def main() -> None:
-    async with rstream.Client.from_env() as client, await client.connect() as control:
+    async with (
+        app.router.lifespan_context(app),
+        rstream.Client.from_env() as client,
+        await client.connect() as control,
+    ):
         # Client.from_env reads the same config file and environment variables
         # used by the rstream CLI and the other SDKs.
         tunnel = await control.create_tunnel(

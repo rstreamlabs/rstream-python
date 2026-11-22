@@ -1,10 +1,20 @@
-# Python SDK documentation
+# Python SDK guides
 
-Read these documents in order:
+The SDK brings outbound rstream connectivity into Python applications.
+It can serve HTTP directly, relay to an existing server and dial private
+services.
 
-1. [Configuration](001-configuration.md) documents SDK configuration.
-2. [Tunnels](002-tunnels.md) documents tunnel APIs and behavior.
-3. [Webhooks](003-webhooks.md) documents webhook support.
-4. [Testing](004-testing.md) describes local and CI validation.
-5. [Test matrix](005-test-matrix.md) defines supported runtime combinations.
-6. [GitHub setup](006-github-setup.md) documents repository CI configuration.
+| Start here | Use this guide |
+| --- | --- |
+| Install the SDK or run the checkout | [Run a first Python application](000-getting-started.md). |
+| Pick an application boundary | [Choose a tunnel integration](002-tunnels.md). |
+| Find a complete integration for a framework | [Example catalog](../examples/README.md). |
+
+| When you need to | Read |
+| --- | --- |
+| Set credentials, Engine and CA trust | [Configuration](001-configuration.md). |
+| Handle disconnects and stop an application | [Tunnel lifecycle](tunnels/002-lifecycle.md). |
+| Discover services or observe tunnel changes | [List and watch live tunnels](tunnels/003-inventory.md). |
+| Receive lifecycle notifications | [Webhooks](003-webhooks.md). |
+
+[Contributing](../CONTRIBUTING.md) covers development setup and tests.

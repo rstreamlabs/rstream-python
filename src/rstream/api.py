@@ -78,7 +78,7 @@ class RstreamAPIClient:
             import httpx
         except ImportError as error:
             raise RuntimeError(
-                "Install rstream[api] to resolve managed project endpoints.",
+                "Install rstreamlabs-rstream[api] for managed project discovery.",
                 code="ERR_RSTREAM_API_EXTRA_REQUIRED",
             ) from error
         if not path.startswith("/") or path.startswith("//"):

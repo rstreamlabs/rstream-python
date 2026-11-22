@@ -1,12 +1,13 @@
 # Flask tunnel
 
-Publish a Flask application through a public rstream HTTP tunnel without
-binding the app to a local port.
+Run this application's HTTP handler directly on accepted tunnel streams.
+Use the [checkout environment and project setup](../../docs/000-getting-started.md#build-and-test-the-checkout).
+From the repository root:
 
-```bash
-pip install -e "../../[wsgi,examples]"
-RSTREAM_CONTEXT=tests python main.py
+```sh
+python examples/flask-tunnel/main.py
 ```
 
-The example opens a published HTTP tunnel, then passes each accepted stream to
-Flask through the SDK WSGI adapter.
+Open the printed forwarding address and expect JSON with `framework` set to `flask` and `ok` set to `true`. Stop with
+Ctrl+C. The [HTTP applications guide](../../docs/tunnels/000-http-applications.md)
+explains the `wsgi` adapter and when to forward an existing server.

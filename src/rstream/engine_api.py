@@ -232,7 +232,7 @@ def _require_httpx() -> Any:
         import httpx
     except ImportError as error:
         raise RuntimeError(
-            "Install rstream[api] to call the engine API.",
+            "Install rstreamlabs-rstream[api] to call the engine API.",
             code="ERR_RSTREAM_API_EXTRA_REQUIRED",
         ) from error
     return httpx
@@ -355,7 +355,7 @@ async def _watch_websocket(
         import websockets
     except ImportError as error:
         raise RuntimeError(
-            "Install rstream[realtime] to watch events over WebSocket.",
+            "Install rstreamlabs-rstream[realtime] to watch events over WebSocket.",
             code="ERR_RSTREAM_REALTIME_EXTRA_REQUIRED",
         ) from error
     url = f"wss://{engine}/api/websocket"

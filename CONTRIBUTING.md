@@ -9,15 +9,21 @@ changes, configuration semantics, or new tunnel capabilities, open an issue or
 discussion first so the SDK behavior can stay aligned with the Go, JavaScript,
 Java, and C++ SDKs.
 
+See the [roadmap](roadmap/) for planned transport and lifecycle capabilities.
+
 ## Local setup
 
-Use Python 3.10 or newer:
+Use Python 3.10 or newer with `venv` and pip, Git, and network access for uncached dependencies. Some Linux distributions package `venv` separately. Work from a checkout, not an installed site-packages directory:
 
-```bash
+```sh
+git clone https://github.com/rstreamlabs/rstream-python.git
+cd rstream-python
 python -m venv .venv
 . .venv/bin/activate
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 ```
+
+On Windows, activate the environment with `.\.venv\Scripts\Activate.ps1` instead of the POSIX activation command. Editable installation makes imports use `src/rstream` from this checkout. Local unit and fake-engine tests do not need a rstream account; real-engine checks have separate explicit configuration in [Testing](docs/004-testing.md).
 
 ## Development checks
 
@@ -57,7 +63,7 @@ Use the smallest test that exercises the behavior:
 - framework example tests when changing sample integrations;
 - opt-in e2e tests for real engines and managed environments.
 
-See [docs/004-testing.md](docs/004-testing.md) for the e2e matrix.
+See [Testing](docs/004-testing.md) for commands, the [test coverage](tests/README.md) for suite scope and [repository automation](.github/README.md) for releases.
 
 ## Generated code
 
