@@ -24,13 +24,22 @@ the `asgi` extra alone.
 
 ## Run and verify the FastAPI application
 
-[Install the CLI](https://rstream.io/docs/getting-started/installation) and
-select a hosted project that allows HTTP publication. Replace the example
-endpoint with the one shown by `rstream project list`.
+For hosted rstream, [install the CLI](https://rstream.io/docs/getting-started/installation)
+and use a project that permits HTTP publication. Sign in with the CLI.
 
 ```sh
 rstream login
+```
+
+List your projects.
+
+```sh
 rstream project list
+```
+
+Replace `my-project-endpoint` with the value from the `ENDPOINT` column.
+
+```sh
 rstream project use my-project-endpoint
 ```
 
@@ -45,8 +54,44 @@ export SSL_CERT_FILE=/path/to/ca-bundle.pem
 In PowerShell, set `$env:SSL_CERT_FILE = 'C:\path\to\ca-bundle.pem'`.
 Unattended services can use a provisioned identity.
 
-Save the [README program](../README.md#publish-a-fastapi-application) as
-`main.py` and run:
+Save the following program as `main.py`.
+
+```python
+import asyncio
+from contextlib import suppress
+
+from fastapi import FastAPI
+
+import rstream
+
+app = FastAPI()
+
+
+@app.get("/")
+async def root() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+async def main() -> None:
+    async with (
+        app.router.lifespan_context(app),
+        rstream.Client.from_env() as client,
+        await client.connect() as control,
+    ):
+        tunnel = await control.create_tunnel(
+            protocol="http",
+            http_version="http/1.1",
+            publish=True,
+        )
+        print("Forwarding address:", tunnel.forwarding_address, flush=True)
+        await rstream.asgi.serve(app, tunnel)
+
+
+with suppress(KeyboardInterrupt):
+    asyncio.run(main())
+```
+
+Start the application from that directory.
 
 ```sh
 python main.py
