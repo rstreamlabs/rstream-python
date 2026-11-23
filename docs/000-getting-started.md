@@ -24,20 +24,27 @@ the `asgi` extra alone.
 
 ## Run and verify the FastAPI application
 
-For hosted rstream, [install the CLI](https://rstream.io/docs/getting-started/installation)
-and use a project that permits HTTP publication. Sign in with the CLI.
+With the [rstream CLI](https://rstream.io/docs/getting-started/installation) installed, sign in and approve the request in the browser.
 
 ```sh
 rstream login
 ```
 
-List your projects.
+List the projects available to this identity.
 
 ```sh
 rstream project list
 ```
 
-Replace `my-project-endpoint` with the value from the `ENDPOINT` column.
+If the list is empty, open the workspace in the [Dashboard](https://rstream.io/dashboard).
+Workspace owners and admins can select **Create new project**. A Basic project
+supports this HTTP example. Other members can ask an owner or admin for access
+to an existing project. If the CLI login was limited to specific projects, run
+`rstream login` again to include the intended project. Run `rstream project list`
+again after gaining access.
+
+Choose a project that allows HTTP publication. Replace `my-project-endpoint`
+with its `ENDPOINT` value.
 
 ```sh
 rstream project use my-project-endpoint
@@ -54,7 +61,7 @@ export SSL_CERT_FILE=/path/to/ca-bundle.pem
 In PowerShell, set `$env:SSL_CERT_FILE = 'C:\path\to\ca-bundle.pem'`.
 Unattended services can use a provisioned identity.
 
-Save the following program as `main.py`.
+Save the application as `main.py`.
 
 ```python
 import asyncio
@@ -91,7 +98,7 @@ with suppress(KeyboardInterrupt):
     asyncio.run(main())
 ```
 
-Start the application from that directory.
+Run it from the directory containing `main.py`.
 
 ```sh
 python main.py
@@ -106,8 +113,8 @@ Stop the program with Ctrl+C.
 
 ## Build and test the checkout
 
-Clone the repository. Create and activate an environment as above. From
-the repository root, install the editable SDK and example dependencies.
+Clone the repository and install the checkout in its own environment.
+On macOS or Linux, run the following commands.
 
 ```sh
 git clone https://github.com/rstreamlabs/rstream-python.git
@@ -115,6 +122,11 @@ cd rstream-python
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[examples,asgi,wsgi,api]"
+```
+
+On Windows, use the PowerShell environment commands under [Install the package](#install-the-package), then run the same editable install. To try the checkout's FastAPI example, select a context as above and run this from the repository root.
+
+```sh
 python examples/fastapi-tunnel/main.py
 ```
 

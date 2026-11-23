@@ -90,15 +90,13 @@ not enable TLS 1.3 early data.
 ## Local self-hosted engine
 
 Follow the [self-hosted engine guide](https://rstream.io/docs/tunnels/self-hosted)
-to configure a local engine, select its CLI context and run:
+to configure a local Engine. Replace `tests` with its selected CLI context
+and run the private-tunnel checks.
 
 ```bash
-RSTREAM_CONTEXT=tests \
-RSTREAM_PYTHON_E2E=1 \
-RSTREAM_PYTHON_E2E_PUBLISHED=1 \
-RSTREAM_PYTHON_E2E_PUBLISHED_TCP=1 \
-pytest tests/e2e
+RSTREAM_CONTEXT=tests RSTREAM_PYTHON_E2E=1 pytest tests/e2e
 ```
 
-Enable published checks only when the local engine supports them and its
-forwarding addresses are reachable from the test process.
+Add `RSTREAM_PYTHON_E2E_PUBLISHED=1` for published HTTP. Add
+`RSTREAM_PYTHON_E2E_PUBLISHED_TCP=1` for published TCP when a port range
+is configured. Each forwarding address must be reachable from the test process.
