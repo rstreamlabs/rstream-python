@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.3](https://github.com/rstreamlabs/rstream-python/compare/v0.8.2...v0.8.3) (2026-11-24)
+
+
+### Documentation
+
+* run the FastAPI example directly from the first guide ([7430b06](https://github.com/rstreamlabs/rstream-python/commit/7430b06d02ba6ac145f6c4aadd9db5f58e3e6161))
+* run the FastAPI example directly from the first guide ([5ec1881](https://github.com/rstreamlabs/rstream-python/commit/5ec18817e872bcd9ca43f27e0650989680dd316a))
+
 ## [0.8.2](https://github.com/rstreamlabs/rstream-python/compare/v0.8.1...v0.8.2) (2026-11-22)
 
 
