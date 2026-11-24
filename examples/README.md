@@ -1,7 +1,7 @@
 # Python application examples
 
-[Install the checkout and start the FastAPI application](../docs/000-getting-started.md#build-and-test-the-checkout)
-to verify your Python environment and Engine context. Run commands from the
+[Install the checkout and its example dependencies](../docs/000-getting-started.md#build-and-test-the-checkout).
+Tunnel examples also require a configured project or Engine. Run commands from the
 repository root unless an example gives a different directory. Framework
 samples use the SDK in this checkout. Webhook receivers can be tested locally
 with signed deliveries and need no Engine.

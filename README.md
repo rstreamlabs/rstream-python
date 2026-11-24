@@ -22,9 +22,15 @@ The runtime connects to the engine over TLS. Datagram tunnels, QUIC runtime tran
 
 ## Publish a FastAPI application
 
-[Install the package and select a project](https://github.com/rstreamlabs/rstream-python/blob/main/docs/000-getting-started.md).
-This application owns FastAPI startup and shutdown and serves requests
-directly over the tunnel.
+Install FastAPI and the SDK's ASGI and API extras in the application's virtual environment.
+
+```sh
+python -m pip install "rstreamlabs-rstream[asgi,api]" fastapi
+```
+
+Select a [project or Engine context](https://github.com/rstreamlabs/rstream-python/blob/main/docs/000-getting-started.md#run-and-verify-the-fastapi-application)
+that permits published HTTP. Save the following as `main.py`. FastAPI handles
+requests on the tunnel and owns the route at `/`.
 
 ```python
 import asyncio
@@ -63,7 +69,7 @@ with suppress(KeyboardInterrupt):
 
 Run `python main.py` and open the forwarding address to receive
 `{"status":"ok"}`. The [first-application guide](https://github.com/rstreamlabs/rstream-python/blob/main/docs/000-getting-started.md)
-explains how to verify the endpoint and build the checkout.
+includes environment setup, access requirements and the checkout example.
 
 ## Documentation
 
